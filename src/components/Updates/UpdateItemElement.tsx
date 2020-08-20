@@ -15,7 +15,7 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
   return (
     <React.Fragment>
       <li onClick={handleShow}>
-        {(item as SaleItem).amount !== undefined
+        {(item as SaleItem).amount
           ? `${(item as SaleItem).amount}% off ${item.name}`
           : item.name}
       </li>
@@ -26,7 +26,7 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
 
         <Modal.Body>
           <p>
-            {(item as SaleItem).amount !== undefined ? (
+            {(item as SaleItem).amount ? (
               <span>
                 <del>GTA$ {item.data?.price.toLocaleString()}</del> GTA${" "}
                 {(
