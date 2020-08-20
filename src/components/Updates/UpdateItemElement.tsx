@@ -10,9 +10,7 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
   const [show, setShow] = React.useState(false);
 
   const handleClose = () => setShow(false);
-  const handleShow = () => {
-    setShow(true);
-  };
+  const handleShow = () => setShow(true);
 
   return (
     <React.Fragment>
