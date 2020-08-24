@@ -15,11 +15,13 @@ import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
 import { RouteComponentProps } from "react-router";
 import { bindActionCreators, compose, Dispatch } from "redux";
-import SearchInput from "../../components/SearchInput";
+import Snoowrap from "snoowrap";
+import SearchInput, { SearchInputOption } from "../../components/SearchInput";
 import Firebase, { withFirebase } from "../../Firebase";
 import Update, { SaleItem, UpdateItem } from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
+import { getVehiclesAsSearchInputOptions } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
 import "./UpdateEdit.scss";
@@ -35,7 +37,9 @@ interface UpdateEditProps extends RouteComponentProps<UpdateEditMatch> {
   setUpdate: typeof setUpdate;
   setUpdates: typeof setUpdates;
   vehicles: Vehicle[];
+  vehicleSearchInputOptions: SearchInputOption[];
   setVehicles: typeof setVehicles;
+  redditClient: Snoowrap;
 }
 
 interface UpdateEditState {
@@ -80,6 +84,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         update: {
           new: [],
           sale: [],
+          targetedSale: [],
           twitchPrime: [],
           date: new Date(),
         },
@@ -87,8 +92,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     }
 
     if (!this.props.vehicles.length) {
-      const v = await this.props.firebase!.getVehicles();
-      this.props.setVehicles(v);
+      this.props.firebase!.getVehicles().then(this.props.setVehicles);
     }
   }
 
@@ -118,7 +122,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         ...this.state.update!,
         [key]: [
           ...this.state.update![key].filter(
-            (i: UpdateItem) => item.id !== i.id
+            (i: UpdateItem) => item.item.id !== i.item.id
           ),
           item,
         ],
@@ -133,7 +137,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         ...this.state.update!,
         [key]: [
           ...this.state.update![key].filter(
-            (i: UpdateItem) => item.id !== i.id
+            (i: UpdateItem) => item.item.id !== i.item.id
           ),
         ],
       },
@@ -147,50 +151,154 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
       const update = {
         ...u,
-        new: [...u.new.map((i) => i.docRef)],
-        podium: u.podium?.docRef || null,
-        sale: [...u.sale.map((i) => ({ item: i.docRef, amount: i.amount }))],
-        twitchPrime: [
-          ...u.twitchPrime.map((i) => ({
-            item: i.docRef,
-            amount: i.amount,
-          })),
-        ],
         date: firebase.firestore.Timestamp.fromDate(u.date),
       };
+
+      console.log(update);
 
       this.setState({
         loading: true,
       });
 
-      if (docRef) {
-        docRef!
-          .update(update)
-          .then(() => {
-            this.props.setUpdate(this.state.update!!);
-            this.setState({
-              loading: false,
+      const updateDoc = (resp: any) => {
+        const id = resp.name
+          ? resp.name.substring(3)
+          : resp.json.data.things[0].id;
+
+        if (docRef) {
+          docRef!
+            .update({
+              ...update,
+              redditThread: id,
+            })
+            .then(() => {
+              const u = {
+                ...this.state.update!!,
+                redditThread: id,
+              };
+              this.setState({
+                update: u,
+                loading: false,
+              });
+              this.props.setUpdate(u);
+            })
+            .catch(console.error);
+        } else {
+          this.props.firebase?.db
+            .collection("updates")
+            .add({
+              ...update,
+              redditThread: id,
+            })
+            .then((ref: firebase.firestore.DocumentReference) => {
+              const u = {
+                ...this.state.update!!,
+                redditThread: id,
+                docRef: ref,
+              };
+              this.setState({
+                update: u,
+                loading: false,
+              });
+              this.props.setUpdate(u);
+            })
+            .catch(console.error);
+        }
+      };
+
+      if (this.props.redditClient) {
+        const groups: string[] = [];
+
+        if (update.new.length) {
+          groups.push(
+            "**New Content**\n" +
+              u.new
+                .map((item) =>
+                  item.url
+                    ? ` - [${item.name}](${item.url})`
+                    : ` - ${item.name}`
+                )
+                .join("\n")
+          );
+        }
+        if (update.podium) {
+          groups.push(
+            "**Podium Vehicle**\n" +
+              (update.podium.url
+                ? ` - [${update.podium.name}](${update.podium.url})`
+                : ` - ${update.podium.name}`)
+          );
+        }
+        if (update.sale.length) {
+          groups.push(
+            "**Discounted Content**\n" +
+              u.sale
+                .map((item) =>
+                  item.url
+                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
+                    : ` - ${item.amount}% off ${item.name}`
+                )
+                .join("\n")
+          );
+        }
+        if (update.twitchPrime.length) {
+          groups.push(
+            "**Twitch Prime Bonuses**\n" +
+              u.twitchPrime
+                .map((item) =>
+                  item.url
+                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
+                    : ` - ${item.amount}% off ${item.name}`
+                )
+                .join("\n")
+          );
+        }
+        if (update.targetedSale.length) {
+          groups.push(
+            "**Targeted Sales**\n" +
+              u.targetedSale
+                .map((item) =>
+                  item.url
+                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
+                    : ` - ${item.amount}% off ${item.name}`
+                )
+                .join("\n")
+          );
+        }
+        if (update.timeTrial) {
+          groups.push(
+            `**Time Trial**\n - [${update.timeTrial.name}](${update.timeTrial.url})`
+          );
+        }
+        if (update.rcTimeTrial) {
+          groups.push(
+            `**RC Bandito Time Trial**\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
+          );
+        }
+        if (update.premiumRace) {
+          groups.push(
+            `**Premium Race**\n - [${update.premiumRace.name}](${update.premiumRace.url})`
+          );
+        }
+
+        if (!update.redditThread) {
+          this.props.redditClient
+            .submitSelfpost({
+              subredditName: "gtaonline",
+              title: `${u.date.toLocaleDateString(
+                "en-us"
+              )} Weekly GTA Online Bonuses`,
+              text: groups.join("\n\n"),
+            })
+            .then(updateDoc);
+        } else {
+          this.props.redditClient
+            .getSubmission(update.redditThread)
+            .fetch()
+            .then((s) => {
+              s.edit(groups.join("\n\n")).then(updateDoc);
             });
-          })
-          .catch(console.error);
-      } else {
-        this.props.firebase?.db
-          .collection("updates")
-          .add({
-            ...u,
-            date: firebase.firestore.Timestamp.fromDate(u.date),
-          })
-          .then((ref: firebase.firestore.DocumentReference) => {
-            const u = {
-              ...this.state.update!!,
-              docRef: ref,
-            };
-            this.setState({
-              update: u,
-            });
-            this.props.setUpdate(u);
-          })
-          .catch(console.error);
+        }
       }
     }
   }, 2000);
@@ -200,7 +308,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
   // tslint:disable-next-line: max-func-body-length
   render() {
     const { update, updateExists, loading } = this.state;
-    const { match, vehicles } = this.props;
+    const { match, vehicleSearchInputOptions } = this.props;
 
     return (
       <Container fluid>
@@ -217,11 +325,14 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                 <Form.Group as={Col} md="6" sm="12">
                   <Form.Label>Podium</Form.Label>
                   <SearchInput
-                    options={vehicles.map((v) => ({
-                      label: `${v.manufacturer} ${v.name}`,
-                      value: v,
-                      id: v.docRef!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
+                    selected={
+                      update.podium && {
+                        label: update.podium?.name,
+                        value: update.podium,
+                        id: update.podium.item.id,
+                      }
+                    }
                     onSelect={(option) => {
                       this.setValue("podium", option.value);
                     }}
@@ -231,18 +342,14 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                   <Form.Label>New</Form.Label>
                   <SearchInput
                     multi
-                    options={vehicles.map((v) => ({
-                      label: v.name,
-                      value: v,
-                      id: v.docRef!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) => this.setItem("new", option.value)}
                   />
                   <ListGroup className="mt-2">
                     {this.state.update?.new?.map((i) => (
                       <UpdateItemEditor
                         item={i}
-                        key={i.docRef!.id}
+                        key={i.item!.id}
                         setItem={(item) => this.setItem("new", item)}
                         deleteItem={() => this.deleteItem("new", i)}
                       />
@@ -255,11 +362,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                   <Form.Label>Sale</Form.Label>
                   <SearchInput
                     multi
-                    options={vehicles.map((v) => ({
-                      label: `${v.manufacturer} ${v.name}`,
-                      value: v,
-                      id: v.docRef!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) =>
                       this.setItem("sale", { ...option.value, amount: 10 })
                     }
@@ -269,7 +372,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                       <UpdateItemEditor
                         item={i}
                         sale
-                        key={i.docRef!.id}
+                        key={i.item!.id}
                         setItem={(item) => this.setItem("sale", item)}
                         deleteItem={() => this.deleteItem("sale", i)}
                       />
@@ -280,11 +383,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                   <Form.Label>Twitch Prime</Form.Label>
                   <SearchInput
                     multi
-                    options={vehicles.map((v) => ({
-                      label: `${v.manufacturer} ${v.name}`,
-                      value: v,
-                      id: v.docRef!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) =>
                       this.setItem("twitchPrime", {
                         ...option.value,
@@ -297,9 +396,35 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                       <UpdateItemEditor
                         item={i}
                         sale
-                        key={i.docRef!.id}
+                        key={i.item!.id}
                         setItem={(item) => this.setItem("twitchPrime", item)}
                         deleteItem={() => this.deleteItem("twitchPrime", i)}
+                      />
+                    ))}
+                  </ListGroup>
+                </Form.Group>
+              </Form.Row>
+              <Form.Row className="my-2">
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Targeted Sales</Form.Label>
+                  <SearchInput
+                    multi
+                    options={vehicleSearchInputOptions}
+                    onSelect={(option) =>
+                      this.setItem("targetedSale", {
+                        ...option.value,
+                        amount: 10,
+                      })
+                    }
+                  />
+                  <ListGroup className="mt-2">
+                    {this.state.update?.targetedSale?.map((i) => (
+                      <UpdateItemEditor
+                        item={i}
+                        sale
+                        key={i.item!.id}
+                        setItem={(item) => this.setItem("targetedSale", item)}
+                        deleteItem={() => this.deleteItem("targetedSale", i)}
                       />
                     ))}
                   </ListGroup>
@@ -445,6 +570,8 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
 const mapStateToProps = (state: RootState) => ({
   updates: state.updates.updates,
   vehicles: state.vehicles.vehicles,
+  vehicleSearchInputOptions: getVehiclesAsSearchInputOptions(state),
+  redditClient: state.reddit.redditClient,
 });
 
 export default compose(

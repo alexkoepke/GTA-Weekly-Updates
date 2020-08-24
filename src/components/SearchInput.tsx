@@ -2,7 +2,7 @@ import React from "react";
 import { Button, Dropdown, FormControl, InputGroup } from "react-bootstrap";
 import "./SearchInput.scss";
 
-interface SearchInputOption {
+export interface SearchInputOption {
   label: string;
   value: any;
   id: string;
@@ -10,14 +10,15 @@ interface SearchInputOption {
 
 interface SearchInputProps {
   options: SearchInputOption[];
+  selected?: SearchInputOption;
   onSelect?: (option: SearchInputOption) => void;
   multi?: boolean;
 }
 
-function SearchInput({ options, onSelect, multi }: SearchInputProps) {
+function SearchInput({ options, onSelect, multi, selected }: SearchInputProps) {
   const [search, setSearch] = React.useState("");
   const [selection, setSelection] = React.useState<SearchInputOption | null>(
-    null
+    selected || null
   );
 
   return (
