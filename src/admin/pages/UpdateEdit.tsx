@@ -206,6 +206,20 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
       };
 
+      const getSaleString = (item: SaleItem) => {
+        const getPriceString = (price: number, saleAmount: number) =>
+          (price * (1 - saleAmount / 100)).toLocaleString("en-US");
+        const priceString = item.tradePrice
+          ? `(GTA$ ${getPriceString(
+              item.price,
+              item.amount
+            )} / ${getPriceString(item.tradePrice, item.amount)})`
+          : `(GTA$ ${getPriceString(item.price, item.amount)})`;
+        return item.url
+          ? ` - ${item.amount}% off ${item.name} ${priceString} [↗](${item.url})`
+          : ` - ${item.amount}% off ${item.name} ${priceString}`;
+      };
+
       if (this.props.redditClient) {
         const groups: string[] = [];
 
@@ -218,7 +232,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                     ? ` - [${item.name}](${item.url})`
                     : ` - ${item.name}`
                 )
-                .join("\n")
+                .join("\n\n")
           );
         }
         if (update.podium) {
@@ -231,38 +245,19 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
         if (update.sale.length) {
           groups.push(
-            "**Discounted Content**\n" +
-              u.sale
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
-                    : ` - ${item.amount}% off ${item.name}`
-                )
-                .join("\n")
+            "**Discounted Content**\n" + u.sale.map(getSaleString).join("\n\n")
           );
         }
         if (update.twitchPrime.length) {
           groups.push(
             "**Twitch Prime Bonuses**\n" +
-              u.twitchPrime
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
-                    : ` - ${item.amount}% off ${item.name}`
-                )
-                .join("\n")
+              u.twitchPrime.map(getSaleString).join("\n\n")
           );
         }
         if (update.targetedSale.length) {
           groups.push(
             "**Targeted Sales**\n" +
-              u.targetedSale
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
-                    : ` - ${item.amount}% off ${item.name}`
-                )
-                .join("\n")
+              u.targetedSale.map(getSaleString).join("\n\n")
           );
         }
         if (update.timeTrial) {
@@ -280,6 +275,10 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
             `**Premium Race**\n - [${update.premiumRace.name}](${update.premiumRace.url})`
           );
         }
+
+        groups.push(
+          "View embedded updates [here](https://gtaonline-cf0ea.web.app/)."
+        );
 
         if (!update.redditThread) {
           this.props.redditClient
