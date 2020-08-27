@@ -16,15 +16,26 @@ import { connect } from "react-redux";
 import { RouteComponentProps } from "react-router";
 import { bindActionCreators, compose, Dispatch } from "redux";
 import Snoowrap from "snoowrap";
-import SearchInput from "../../components/SearchInput";
+import SearchInput, { SearchInputOption } from "../../components/SearchInput";
 import Firebase, { withFirebase } from "../../Firebase";
-import Update, { SaleItem, UpdateItem } from "../../models/update";
+import { Mission } from "../../models/mission";
+import Update, {
+  BonusActivity,
+  SaleItem,
+  UpdateItem,
+} from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
+import { setMissions } from "../../store/Missions";
+import {
+  getVehiclesAsSearchInputOptions,
+  getMissionsAsSearchInputOptions,
+} from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
+import UpdateActivityEditor from "./UpdateActivityEditor";
 
 interface UpdateEditMatch {
   id?: string;
@@ -36,7 +47,11 @@ interface UpdateEditProps extends RouteComponentProps<UpdateEditMatch> {
   setUpdate: typeof setUpdate;
   setUpdates: typeof setUpdates;
   vehicles: Vehicle[];
+  vehicleSearchInputOptions: SearchInputOption[];
   setVehicles: typeof setVehicles;
+  missions: Mission[];
+  missionSearchInputOptions: SearchInputOption[];
+  setMissions: typeof setMissions;
   redditClient: Snoowrap;
 }
 
@@ -80,6 +95,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     } else {
       this.setState({
         update: {
+          bonusActivities: [],
           new: [],
           sale: [],
           targetedSale: [],
@@ -91,6 +107,10 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
     if (!this.props.vehicles.length) {
       this.props.firebase!.getVehicles().then(this.props.setVehicles);
+    }
+
+    if (!this.props.missions.length) {
+      this.props.firebase!.getMissions().then(this.props.setMissions);
     }
   }
 
@@ -143,20 +163,38 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     this.debouncedSave();
   };
 
+  setActivity = (activity: BonusActivity) => {
+    this.setState({
+      update: {
+        ...this.state.update!,
+        bonusActivities: [
+          ...this.state.update!.bonusActivities.filter(
+            (a: BonusActivity) => activity.activity.id !== a.activity.id
+          ),
+          activity,
+        ],
+      },
+    });
+    this.debouncedSave();
+  };
+
+  deleteActivity = (activity: BonusActivity) => {
+    this.setState({
+      update: {
+        ...this.state.update!,
+        bonusActivities: [
+          ...this.state.update!.bonusActivities.filter(
+            (a: BonusActivity) => activity.activity.id !== a.activity.id
+          ),
+        ],
+      },
+    });
+    this.debouncedSave();
+  };
+
   saveUpdate = _.throttle(() => {
     if (this.state.update) {
       const { docRef, ...u } = this.state.update;
-
-      const mapItem = (_item: Vehicle | UpdateItem) => {
-        const { docRef, manufacturer, ..._i } = _item;
-        const item = (_item as UpdateItem).item;
-
-        return {
-          ..._i,
-          name: manufacturer ? `${manufacturer} ${_item.name}` : _item.name,
-          item: docRef || item,
-        };
-      };
 
       const update = {
         ...u,
@@ -181,10 +219,15 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
               redditThread: id,
             })
             .then(() => {
-              this.props.setUpdate(this.state.update!!);
+              const u = {
+                ...this.state.update!!,
+                redditThread: id,
+              };
               this.setState({
+                update: u,
                 loading: false,
               });
+              this.props.setUpdate(u);
             })
             .catch(console.error);
         } else {
@@ -197,15 +240,31 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
             .then((ref: firebase.firestore.DocumentReference) => {
               const u = {
                 ...this.state.update!!,
+                redditThread: id,
                 docRef: ref,
               };
               this.setState({
                 update: u,
+                loading: false,
               });
               this.props.setUpdate(u);
             })
             .catch(console.error);
         }
+      };
+
+      const getSaleString = (item: SaleItem) => {
+        const getPriceString = (price: number, saleAmount: number) =>
+          (price * (1 - saleAmount / 100)).toLocaleString("en-US");
+        const priceString = item.tradePrice
+          ? `(GTA$ ${getPriceString(
+              item.price,
+              item.amount
+            )} / ${getPriceString(item.tradePrice, item.amount)})`
+          : `(GTA$ ${getPriceString(item.price, item.amount)})`;
+        return item.url
+          ? ` - ${item.amount}% off ${item.name} ${priceString} [↗](${item.url})`
+          : ` - ${item.amount}% off ${item.name} ${priceString}`;
       };
 
       if (this.props.redditClient) {
@@ -214,28 +273,38 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         if (update.new.length) {
           groups.push(
             "**New Content**\n" +
-              u.new.map((item) => ` - ${item.name}`).join("\n")
+              u.new
+                .map((item) =>
+                  item.url
+                    ? ` - [${item.name}](${item.url})`
+                    : ` - ${item.name}`
+                )
+                .join("\n\n")
           );
         }
         if (update.podium) {
-          groups.push(`**Podium Vehicle**\n - ${update.podium.name}`);
+          groups.push(
+            "**Podium Vehicle**\n" +
+              (update.podium.url
+                ? ` - [${update.podium.name}](${update.podium.url})`
+                : ` - ${update.podium.name}`)
+          );
         }
         if (update.sale.length) {
           groups.push(
-            "**Discounted Content**\n" +
-              u.sale.map((item) => ` - ${item.name}`).join("\n")
+            "**Discounted Content**\n" + u.sale.map(getSaleString).join("\n\n")
           );
         }
         if (update.twitchPrime.length) {
           groups.push(
             "**Twitch Prime Bonuses**\n" +
-              u.twitchPrime.map((item) => ` - ${item.name}`).join("\n")
+              u.twitchPrime.map(getSaleString).join("\n\n")
           );
         }
         if (update.targetedSale.length) {
           groups.push(
             "**Targeted Sales**\n" +
-              u.targetedSale.map((item) => ` - ${item.name}`).join("\n")
+              u.targetedSale.map(getSaleString).join("\n\n")
           );
         }
         if (update.timeTrial) {
@@ -253,6 +322,10 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
             `**Premium Race**\n - [${update.premiumRace.name}](${update.premiumRace.url})`
           );
         }
+
+        groups.push(
+          "View embedded updates [here](https://gtaonline-cf0ea.web.app/)."
+        );
 
         if (!update.redditThread) {
           this.props.redditClient
@@ -281,17 +354,11 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
   // tslint:disable-next-line: max-func-body-length
   render() {
     const { update, updateExists, loading } = this.state;
-    const { match, vehicles } = this.props;
-
-    const updateVehicles = vehicles.map((v) => {
-      const { docRef, manufacturer, ...vehicle } = v;
-
-      return {
-        ...vehicle,
-        name: manufacturer ? `${manufacturer} ${v.name}` : v.name,
-        item: docRef,
-      };
-    });
+    const {
+      match,
+      vehicleSearchInputOptions,
+      missionSearchInputOptions,
+    } = this.props;
 
     return (
       <Container fluid>
@@ -308,11 +375,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                 <Form.Group as={Col} md="6" sm="12">
                   <Form.Label>Podium</Form.Label>
                   <SearchInput
-                    options={updateVehicles.map((v) => ({
-                      label: v.name,
-                      value: v,
-                      id: v.item!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     selected={
                       update.podium && {
                         label: update.podium?.name,
@@ -329,11 +392,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                   <Form.Label>New</Form.Label>
                   <SearchInput
                     multi
-                    options={updateVehicles.map((v) => ({
-                      label: v.name,
-                      value: v,
-                      id: v.item!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) => this.setItem("new", option.value)}
                   />
                   <ListGroup className="mt-2">
@@ -350,14 +409,30 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
               </Form.Row>
               <Form.Row className="my-2">
                 <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Bonus GTA$ and RP Activities</Form.Label>
+                  <SearchInput
+                    multi
+                    options={missionSearchInputOptions}
+                    onSelect={(option) => this.setActivity(option.value)}
+                  />
+                  <ListGroup className="mt-2">
+                    {this.state.update?.bonusActivities?.map((a) => (
+                      <UpdateActivityEditor
+                        activity={a}
+                        key={a.activity!.id}
+                        setActivity={this.setActivity}
+                        deleteActivity={() => this.deleteActivity(a)}
+                      />
+                    ))}
+                  </ListGroup>
+                </Form.Group>
+              </Form.Row>
+              <Form.Row className="my-2">
+                <Form.Group as={Col} md="6" sm="12">
                   <Form.Label>Sale</Form.Label>
                   <SearchInput
                     multi
-                    options={updateVehicles.map((v) => ({
-                      label: v.name,
-                      value: v,
-                      id: v.item!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) =>
                       this.setItem("sale", { ...option.value, amount: 10 })
                     }
@@ -378,11 +453,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                   <Form.Label>Twitch Prime</Form.Label>
                   <SearchInput
                     multi
-                    options={updateVehicles.map((v) => ({
-                      label: v.name,
-                      value: v,
-                      id: v.item!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) =>
                       this.setItem("twitchPrime", {
                         ...option.value,
@@ -408,11 +479,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                   <Form.Label>Targeted Sales</Form.Label>
                   <SearchInput
                     multi
-                    options={updateVehicles.map((v) => ({
-                      label: v.name,
-                      value: v,
-                      id: v.item!.id,
-                    }))}
+                    options={vehicleSearchInputOptions}
                     onSelect={(option) =>
                       this.setItem("targetedSale", {
                         ...option.value,
@@ -566,6 +633,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       setUpdate,
       setUpdates,
       setVehicles,
+      setMissions,
     },
     dispatch
   );
@@ -573,6 +641,9 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
 const mapStateToProps = (state: RootState) => ({
   updates: state.updates.updates,
   vehicles: state.vehicles.vehicles,
+  vehicleSearchInputOptions: getVehiclesAsSearchInputOptions(state),
+  missions: state.missions.missions,
+  missionSearchInputOptions: getMissionsAsSearchInputOptions(state),
   redditClient: state.reddit.redditClient,
 });
 

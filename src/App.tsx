@@ -85,7 +85,7 @@ function App({
           isAuthenticated={isAdmin}
           component={Admin}
           authenticationPath="/login"
-          setRedirectUrl={(path) => setRedirectUrl(path)}
+          setRedirectUrl={setRedirectUrl}
         />
         <Route
           path="/weekly-faq"
