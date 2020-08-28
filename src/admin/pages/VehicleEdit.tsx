@@ -75,7 +75,7 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
       }
     } else {
       this.setState({
-        vehicle: { name: "", shop: shops[0] },
+        vehicle: { name: "", shop: shops[0], manufacturer: "" },
       });
     }
   }
