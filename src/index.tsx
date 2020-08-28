@@ -10,6 +10,9 @@ import Firebase, { FirebaseContext } from "./Firebase";
 import "./index.scss";
 import * as serviceWorker from "./serviceWorker";
 import { rootReducer } from "./store";
+import AOS from "aos";
+
+AOS.init();
 
 const store = createStore(rootReducer, applyMiddleware(thunk));
 
