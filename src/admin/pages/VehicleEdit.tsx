@@ -1,14 +1,14 @@
 import firebase from "firebase";
 import _ from "lodash";
 import React from "react";
-import { Col, Container, Form, Image, Spinner } from "react-bootstrap";
+import { Button, Col, Container, Form, Image, Spinner } from "react-bootstrap";
 import { connect } from "react-redux";
 import { RouteComponentProps } from "react-router";
 import { bindActionCreators, compose, Dispatch } from "redux";
 import Firebase, { withFirebase } from "../../Firebase";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
-import { setVehicle, setVehicles } from "../../store/Vehicles";
+import { setVehicle } from "../../store/Vehicles";
 
 const shops = [
   "Legendary Motorsports",
@@ -16,6 +16,7 @@ const shops = [
   "Southern San Andreas Super Autos",
   "Warstock Cache & Carry",
   "Benny's Original Motor Works",
+  "DockTease",
 ];
 
 interface VehicleEditMatch {
@@ -26,12 +27,12 @@ interface VehicleEditProps extends RouteComponentProps<VehicleEditMatch> {
   firebase?: Firebase;
   vehicles: Vehicle[];
   setVehicle: typeof setVehicle;
-  setVehicles: typeof setVehicles;
 }
 
 interface VehicleEditState {
   vehicle?: Vehicle;
   vehicleExists: boolean;
+  vehicleAlreadyExists: boolean;
   loading: boolean;
 }
 
@@ -42,47 +43,65 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
     this.state = {
       vehicleExists: true,
       loading: false,
+      vehicleAlreadyExists: false,
     };
   }
 
   async componentDidMount() {
     if (this.props.match.params.id) {
-      if (!this.props.vehicles.length) {
-        const v = await this.props.firebase!.getVehicles();
-        this.props.setVehicles(v);
-      }
-
-      const vehicle = this.props.vehicles.filter(
+      const v = this.props.vehicles.filter(
         (v) => v.docRef?.id === this.props.match.params.id
       );
 
-      if (vehicle.length) {
+      if (v.length) {
         this.setState({
-          vehicle: vehicle[0],
+          vehicle: v[0],
         });
       } else {
-        this.setState({
-          vehicleExists: false,
-        });
+        const v = await this.props.firebase!.getVehicle(
+          this.props.match.params.id
+        );
+
+        if (v) {
+          this.props.setVehicle(v);
+          this.setState({
+            vehicle: v,
+          });
+        } else {
+          this.setState({
+            vehicleExists: false,
+          });
+        }
       }
     } else {
       this.setState({
-        vehicle: { name: "" },
+        vehicle: { name: "", shop: shops[0] },
       });
     }
   }
 
   setValue = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = event.target;
+
+    if (name === "name") {
+      const v = this.props.vehicles.filter((_v) => _v.name === value);
+      if (v.length) {
+        this.setState({
+          vehicleAlreadyExists: true,
+        });
+      }
+    }
+
     this.setState({
       vehicle: {
         ...this.state.vehicle!!,
-        [event.target.name]: event.target.value,
+        [name]: type === "number" ? parseInt(value) : value,
       },
     });
-    this.saveVehicle();
+    this.debouncedSave();
   };
 
-  saveVehicle = _.debounce(() => {
+  saveVehicle = _.throttle(() => {
     if (this.state.vehicle) {
       const { docRef, ...v } = this.state.vehicle;
 
@@ -108,6 +127,7 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
             const v = {
               ...this.state.vehicle!!,
               docRef: ref,
+              id: ref.id,
             };
             this.setState({
               vehicle: v,
@@ -117,10 +137,17 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
           .catch(console.error);
       }
     }
-  }, 1000);
+  }, 2000);
+
+  debouncedSave = _.debounce(this.saveVehicle, 5000);
 
   render() {
-    const { vehicle, vehicleExists, loading } = this.state;
+    const {
+      vehicle,
+      vehicleExists,
+      loading,
+      vehicleAlreadyExists,
+    } = this.state;
     const { match } = this.props;
 
     return (
@@ -154,6 +181,12 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
                     value={vehicle.name}
                     onChange={this.setValue}
                   />
+                  {vehicleAlreadyExists && (
+                    <Form.Text className="text-danger">
+                      This vehicle name is already in use, make sure the entry
+                      doesn't already exist.
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Form.Row>
               <Form.Row className="mb-2">
@@ -168,13 +201,28 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
               </Form.Row>
               <Form.Row className="mb-2">
                 <Form.Group as={Col}>
-                  <Form.Control
-                    placeholder="Price"
-                    name="price"
-                    value={vehicle.price}
-                    onChange={this.setValue}
-                    type="number"
-                  />
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <Form.Label className="m-0 px-4">Price</Form.Label>
+                    <Form.Control
+                      placeholder="Price"
+                      className="w-75"
+                      name="price"
+                      value={vehicle.price}
+                      onChange={this.setValue}
+                      type="number"
+                    />
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <Form.Label className="m-0 px-4">Trade Price</Form.Label>
+                    <Form.Control
+                      placeholder="Trade Price"
+                      className="w-75"
+                      name="tradePrice"
+                      value={vehicle.tradePrice}
+                      onChange={this.setValue}
+                      type="number"
+                    />
+                  </div>
                 </Form.Group>
                 <Col>
                   <Form.Group className="d-flex align-items-center">
@@ -209,13 +257,16 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
                 </Form.Group>
               </Form.Row>
             </Form>
-            {loading && (
-              <div className="d-flex flex-row-reverse">
+            <div className="d-flex flex-row-reverse">
+              <Button onClick={this.saveVehicle} className="rockstar-yellow">
+                Save
+              </Button>
+              {loading && (
                 <Spinner animation="border" role="status" className="mr-4 mt-2">
                   <span className="sr-only">Loading...</span>
                 </Spinner>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : match.params.id && !vehicleExists ? (
           <div>
@@ -231,7 +282,6 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
   bindActionCreators(
     {
       setVehicle,
-      setVehicles,
     },
     dispatch
   );

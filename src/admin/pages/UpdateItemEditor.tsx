@@ -24,7 +24,7 @@ function UpdateItemEditor({
         {sale && (
           <FormControl
             value={(item as SaleItem).amount}
-            style={{ flex: "100000", maxWidth: "80px" }}
+            style={{ maxWidth: "80px" }}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               setItem({
                 ...item,
@@ -36,6 +36,15 @@ function UpdateItemEditor({
         )}
         <InputGroup.Append>
           {sale && <InputGroup.Text>%</InputGroup.Text>}
+          {sale && (
+            <InputGroup.Text>
+              GTA${" "}
+              {(
+                item.price *
+                (1 - (item as SaleItem).amount / 100)
+              ).toLocaleString()}
+            </InputGroup.Text>
+          )}
           <Button
             variant="secondary"
             onClick={deleteItem}

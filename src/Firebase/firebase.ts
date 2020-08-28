@@ -2,11 +2,12 @@ import app from "firebase/app";
 import "firebase/auth";
 import "firebase/firestore";
 import "firebase/functions";
+import { Mission } from "../models/mission";
 import Update from "../models/update";
 import { Vehicle } from "../models/vehicle";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAuQm6JQ5NtDuPcxcOskE9TieIWgeNVTr8",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: "gtaonline-cf0ea.firebaseapp.com",
   databaseURL: "https://gtaonline-cf0ea.firebaseio.com",
   projectId: "gtaonline-cf0ea",
@@ -30,9 +31,9 @@ class Firebase {
   }
 
   createUserWithEmailAndPassword = (email: string, password: string) =>
-    this.auth.createUserWithEmailAndPassword(email, password).catch((error) => {
-      throw error;
-    });
+    this.auth
+      .createUserWithEmailAndPassword(email, password)
+      .catch(console.error);
 
   signInWithEmailAndPassword = async (email: string, password: string) => {
     try {
@@ -43,93 +44,70 @@ class Firebase {
     }
   };
 
-  signOut = () =>
-    this.auth.signOut().catch((error) => {
-      console.error(error);
-    });
+  signOut = () => this.auth.signOut().catch(console.error);
 
   resetPassword = (email: string) =>
-    this.auth.sendPasswordResetEmail(email).catch((error) => {
-      console.error(error);
-    });
+    this.auth.sendPasswordResetEmail(email).catch(console.error);
 
   updatePassword = (password: string) =>
-    this.auth.currentUser?.updatePassword(password).catch((error) => {
-      console.error(error);
-    });
+    this.auth.currentUser?.updatePassword(password).catch(console.error);
 
   getUserDoc = async (userId: string) => {
     const snapshot = await this.db.collection("users").doc(userId).get();
+
     if (snapshot?.exists) {
       return snapshot;
     }
     return null;
   };
 
-  getUpdates = async () => {
-    const snapshot = await this.db.collection("updates").get();
+  getUpdates = async (limit: number = 15) => {
+    const snapshot = await this.db
+      .collection("updates")
+      .orderBy("date", "desc")
+      .limit(limit)
+      .get();
 
-    const getItem = async (item: app.firestore.DocumentReference) => {
-      const s = await item.get();
-      return {
-        name: s.data()!.manufacturer
-          ? `${s.data()!.manufacturer} ${s.data()!.name}`
-          : s.data()!.name,
-        docRef: item,
-        id: item.id,
-        data: s.data()!,
-      };
-    };
-
-    const getItems = async (items?: app.firestore.DocumentData[]) =>
-      items
-        ? Promise.all(
-            items
-              .filter((item) => item != null)
-              .map((item) => getItem(item.item || item))
-          )
-        : [];
-
-    const getSales = async (sale?: app.firestore.DocumentData[]) =>
-      sale
-        ? Promise.all(
-            sale.map(async (item) => ({
-              ...(await getItem(item.item)),
-              amount: item.amount,
-            }))
-          )
-        : [];
-
-    const u: Update[] = [];
-
-    for (const doc of snapshot!.docs) {
-      const update = {
-        podium: doc.data()!.podium && (await getItem(doc.data()!.podium)),
-        new: await getItems(doc.data()!.new),
-        sale: await getSales(doc.data()!.sale),
-        twitchPrime: await getSales(doc.data()!.twitchPrime),
-        date: new Date(doc.data()!.date.seconds * 1000),
-        docRef: doc.ref,
-      };
-      u.push(update);
-    }
-
-    return u;
+    return snapshot!.docs.map((doc) => ({
+      ...(doc.data() as Update),
+      bonusActivities: doc.data()!.bonusActivities || [],
+      date: new Date(doc.data()!.date.seconds * 1000),
+      docRef: doc.ref,
+    }));
   };
 
   getVehicles = async () => {
-    const snapshot = await this.db.collection("vehicles").get();
+    const snapshot = await this.db
+      .collection("vehicles")
+      .orderBy("manufacturer")
+      .get();
 
-    const v: Vehicle[] = [];
+    return snapshot!.docs.map((doc) => ({
+      ...(doc.data() as Vehicle),
+      docRef: doc.ref,
+    }));
+  };
 
-    for (const doc of snapshot!.docs) {
-      v.push({
+  getVehicle = async (id: string) => {
+    const doc = await this.db.collection("vehicles").doc(id).get();
+
+    if (doc.exists) {
+      return {
         ...(doc.data() as Vehicle),
         docRef: doc.ref,
-      });
+      };
+    } else {
+      return null;
     }
+  };
 
-    return v;
+  getMissions = async () => {
+    const snapshot = await this.db.collection("missions").orderBy("name").get();
+
+    return snapshot!.docs.map((doc) => ({
+      ...(doc.data() as Mission),
+      docRef: doc.ref,
+    }));
   };
 }
 
