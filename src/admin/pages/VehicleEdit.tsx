@@ -95,7 +95,7 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
     this.setState({
       vehicle: {
         ...this.state.vehicle!!,
-        [name]: type === "number" ? parseInt(value) : value,
+        [name]: type === "number" && value ? parseInt(value) : value,
       },
     });
     this.debouncedSave();
