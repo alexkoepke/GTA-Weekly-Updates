@@ -15,7 +15,7 @@ import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
 import { RouteComponentProps } from "react-router";
 import { bindActionCreators, compose, Dispatch } from "redux";
-import Snoowrap from "snoowrap";
+import Snoowrap, { SnoowrapOptions } from "snoowrap";
 import SearchInput, { SearchInputOption } from "../../components/SearchInput";
 import Firebase, { withFirebase } from "../../Firebase";
 import { Mission } from "../../models/mission";
@@ -27,15 +27,16 @@ import Update, {
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
 import { setMissions } from "../../store/Missions";
+import { setRedditClient } from "../../store/Reddit";
 import {
-  getVehiclesAsSearchInputOptions,
   getMissionsAsSearchInputOptions,
+  getVehiclesAsSearchInputOptions,
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
+import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
-import UpdateActivityEditor from "./UpdateActivityEditor";
 
 interface UpdateEditMatch {
   id?: string;
@@ -53,6 +54,7 @@ interface UpdateEditProps extends RouteComponentProps<UpdateEditMatch> {
   missionSearchInputOptions: SearchInputOption[];
   setMissions: typeof setMissions;
   redditClient: Snoowrap;
+  setRedditClient: typeof setRedditClient;
 }
 
 interface UpdateEditState {
@@ -111,6 +113,18 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
     if (!this.props.missions.length) {
       this.props.firebase!.getMissions().then(this.props.setMissions);
+    }
+
+    if (!this.props.redditClient) {
+      this.props
+        .firebase!.db.collection("configs")
+        .doc("reddit")
+        .get()
+        .then((snapshot) =>
+          this.props.setRedditClient(
+            new Snoowrap({ ...(snapshot.data()! as SnoowrapOptions) })
+          )
+        );
     }
   }
 
@@ -201,8 +215,6 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         date: firebase.firestore.Timestamp.fromDate(u.date),
       };
 
-      console.log(update);
-
       this.setState({
         loading: true,
       });
@@ -256,15 +268,24 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
       const getSaleString = (item: SaleItem) => {
         const getPriceString = (price: number, saleAmount: number) =>
           (price * (1 - saleAmount / 100)).toLocaleString("en-US");
-        const priceString = item.tradePrice
-          ? `(GTA$ ${getPriceString(
-              item.price,
-              item.amount
-            )} / ${getPriceString(item.tradePrice, item.amount)})`
-          : `(GTA$ ${getPriceString(item.price, item.amount)})`;
+        let priceString = "";
+        if (item.price) {
+          priceString = item.tradePrice
+            ? ` (GTA$ ${getPriceString(
+                item.price,
+                item.amount
+              )} / ${getPriceString(item.tradePrice, item.amount)})`
+            : ` (GTA$ ${getPriceString(item.price, item.amount)})`;
+        } else if (item.minPrice && item.maxPrice) {
+          priceString = ` (GTA$ ${getPriceString(
+            item.minPrice,
+            item.amount
+          )} - ${getPriceString(item.maxPrice, item.amount)})`;
+        }
+
         return item.url
-          ? ` - ${item.amount}% off ${item.name} ${priceString} [↗](${item.url})`
-          : ` - ${item.amount}% off ${item.name} ${priceString}`;
+          ? ` - ${item.amount}% off ${item.name}${priceString} [↗](${item.url})`
+          : ` - ${item.amount}% off ${item.name}${priceString}`;
       };
 
       if (this.props.redditClient) {
@@ -272,11 +293,11 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
         if (update.new.length) {
           groups.push(
-            "**New Content**\n" +
+            "**New Content**\n\n" +
               u.new
                 .map((item) =>
                   item.url
-                    ? ` - [${item.name}](${item.url})`
+                    ? ` - ${item.name} [↗](${item.url})`
                     : ` - ${item.name}`
                 )
                 .join("\n\n")
@@ -284,42 +305,68 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
         if (update.podium) {
           groups.push(
-            "**Podium Vehicle**\n" +
+            "**Podium Vehicle**\n\n" +
               (update.podium.url
-                ? ` - [${update.podium.name}](${update.podium.url})`
+                ? ` - ${update.podium.name} [↗](${update.podium.url})`
                 : ` - ${update.podium.name}`)
+          );
+        }
+        if (update.bonusActivities.length) {
+          groups.push(
+            "**Bonus GTA$ and RP Activities**\n\n" +
+              u.bonusActivities
+                .map((activity) => {
+                  const bonusString =
+                    activity.moneyAmount === activity.rpAmount
+                      ? activity.moneyAmount + "x GTA$ and RP"
+                      : activity.moneyAmount +
+                        "x GTA$ and " +
+                        activity.rpAmount +
+                        "x RP";
+
+                  return (
+                    " - " +
+                    bonusString +
+                    " on " +
+                    (activity.url
+                      ? `${activity.name} [↗](${activity.url})`
+                      : `${activity.name}`)
+                  );
+                })
+                .join("\n\n")
           );
         }
         if (update.sale.length) {
           groups.push(
-            "**Discounted Content**\n" + u.sale.map(getSaleString).join("\n\n")
+            "**Discounted Content**\n\n" +
+              u.sale.map(getSaleString).join("\n\n")
           );
         }
         if (update.twitchPrime.length) {
           groups.push(
-            "**Twitch Prime Bonuses**\n" +
+            "**Twitch Prime Bonuses**\n\n" +
               u.twitchPrime.map(getSaleString).join("\n\n")
           );
         }
         if (update.targetedSale.length) {
           groups.push(
-            "**Targeted Sales**\n" +
+            "**Targeted Sales**\n\n" +
               u.targetedSale.map(getSaleString).join("\n\n")
           );
         }
         if (update.timeTrial) {
           groups.push(
-            `**Time Trial**\n - [${update.timeTrial.name}](${update.timeTrial.url})`
+            `**Time Trial**\n\n - [${update.timeTrial.name}](${update.timeTrial.url})`
           );
         }
         if (update.rcTimeTrial) {
           groups.push(
-            `**RC Bandito Time Trial**\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
+            `**RC Bandito Time Trial**\n\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
           );
         }
         if (update.premiumRace) {
           groups.push(
-            `**Premium Race**\n - [${update.premiumRace.name}](${update.premiumRace.url})`
+            `**Premium Race**\n\n - [${update.premiumRace.name}](${update.premiumRace.url})`
           );
         }
 
@@ -634,6 +681,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       setUpdates,
       setVehicles,
       setMissions,
+      setRedditClient,
     },
     dispatch
   );
