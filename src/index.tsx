@@ -1,3 +1,5 @@
+import AOS from "aos";
+import "aos/dist/aos.css";
 import React from "react";
 import "react-datepicker/dist/react-datepicker.css";
 import ReactDOM from "react-dom";
@@ -10,9 +12,10 @@ import Firebase, { FirebaseContext } from "./Firebase";
 import "./index.scss";
 import * as serviceWorker from "./serviceWorker";
 import { rootReducer } from "./store";
-import AOS from "aos";
 
-AOS.init();
+AOS.init({
+  mirror: true,
+});
 
 const store = createStore(rootReducer, applyMiddleware(thunk));
 
