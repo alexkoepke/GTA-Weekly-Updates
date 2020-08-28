@@ -8,7 +8,7 @@ import { bindActionCreators, compose, Dispatch } from "redux";
 import Firebase, { withFirebase } from "../../Firebase";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
-import { setVehicle, setVehicles } from "../../store/Vehicles";
+import { setVehicle } from "../../store/Vehicles";
 
 const shops = [
   "Legendary Motorsports",
@@ -16,6 +16,7 @@ const shops = [
   "Southern San Andreas Super Autos",
   "Warstock Cache & Carry",
   "Benny's Original Motor Works",
+  "DockTease",
 ];
 
 interface VehicleEditMatch {
@@ -26,12 +27,12 @@ interface VehicleEditProps extends RouteComponentProps<VehicleEditMatch> {
   firebase?: Firebase;
   vehicles: Vehicle[];
   setVehicle: typeof setVehicle;
-  setVehicles: typeof setVehicles;
 }
 
 interface VehicleEditState {
   vehicle?: Vehicle;
   vehicleExists: boolean;
+  vehicleAlreadyExists: boolean;
   loading: boolean;
 }
 
@@ -42,38 +43,54 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
     this.state = {
       vehicleExists: true,
       loading: false,
+      vehicleAlreadyExists: false,
     };
   }
 
   async componentDidMount() {
     if (this.props.match.params.id) {
-      if (!this.props.vehicles.length) {
-        const v = await this.props.firebase!.getVehicles();
-        this.props.setVehicles(v);
-      }
-
-      const vehicle = this.props.vehicles.filter(
+      const v = this.props.vehicles.filter(
         (v) => v.docRef?.id === this.props.match.params.id
       );
 
-      if (vehicle.length) {
+      if (v.length) {
         this.setState({
-          vehicle: vehicle[0],
+          vehicle: v[0],
         });
       } else {
-        this.setState({
-          vehicleExists: false,
-        });
+        const v = await this.props.firebase!.getVehicle(
+          this.props.match.params.id
+        );
+
+        if (v) {
+          this.props.setVehicle(v);
+          this.setState({
+            vehicle: v,
+          });
+        } else {
+          this.setState({
+            vehicleExists: false,
+          });
+        }
       }
     } else {
       this.setState({
-        vehicle: { name: "" },
+        vehicle: { name: "", shop: shops[0] },
       });
     }
   }
 
   setValue = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = event.target;
+
+    if (name === "name") {
+      const v = this.props.vehicles.filter((_v) => _v.name === value);
+      if (v.length) {
+        this.setState({
+          vehicleAlreadyExists: true,
+        });
+      }
+    }
 
     this.setState({
       vehicle: {
@@ -86,7 +103,7 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
 
   saveVehicle = _.throttle(() => {
     if (this.state.vehicle) {
-      const { docRef, id, ...v } = this.state.vehicle;
+      const { docRef, ...v } = this.state.vehicle;
 
       this.setState({
         loading: true,
@@ -120,12 +137,17 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
           .catch(console.error);
       }
     }
-  }, 5000);
+  }, 2000);
 
-  debouncedSave = _.debounce(this.saveVehicle, 2000);
+  debouncedSave = _.debounce(this.saveVehicle, 5000);
 
   render() {
-    const { vehicle, vehicleExists, loading } = this.state;
+    const {
+      vehicle,
+      vehicleExists,
+      loading,
+      vehicleAlreadyExists,
+    } = this.state;
     const { match } = this.props;
 
     return (
@@ -159,6 +181,12 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
                     value={vehicle.name}
                     onChange={this.setValue}
                   />
+                  {vehicleAlreadyExists && (
+                    <Form.Text className="text-danger">
+                      This vehicle name is already in use, make sure the entry
+                      doesn't already exist.
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Form.Row>
               <Form.Row className="mb-2">
@@ -254,7 +282,6 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
   bindActionCreators(
     {
       setVehicle,
-      setVehicles,
     },
     dispatch
   );

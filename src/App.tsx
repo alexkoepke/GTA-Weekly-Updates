@@ -15,17 +15,23 @@ import SignUp from "./pages/SignUp";
 import VehicleView from "./pages/VehicleView";
 import { RootState } from "./store";
 import { loadFaqThread } from "./store/Reddit";
-import { setIsAdmin, setLoggedIn, setRedirectUrl } from "./store/User";
+import {
+  setAuthReady,
+  setIsAdmin,
+  setLoggedIn,
+  setRedirectUrl
+} from "./store/User";
 
 interface AppProps {
   firebase?: Firebase;
   setLoggedIn: typeof setLoggedIn;
   faqThread?: string;
   loadFaqThread: typeof loadFaqThread;
-  loggedIn: boolean;
   isAdmin: boolean;
   setIsAdmin: typeof setIsAdmin;
   setRedirectUrl: (path?: string) => void;
+  authReady: boolean;
+  setAuthReady: typeof setAuthReady;
 }
 
 function App({
@@ -33,26 +39,37 @@ function App({
   setLoggedIn,
   faqThread,
   loadFaqThread,
-  loggedIn,
   isAdmin,
-  setIsAdmin,
   setRedirectUrl,
+  authReady,
+  setAuthReady,
+  setIsAdmin,
 }: AppProps) {
   React.useEffect(() => {
     loadFaqThread();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!loggedIn && firebase?.auth.currentUser) {
-    setLoggedIn(true);
-    firebase
-      ?.getUserDoc(firebase?.auth.currentUser.uid)
-      .then((snapshot: firebase.firestore.DocumentSnapshot | null) => {
-        if (snapshot && snapshot.data()?.admin) {
-          setIsAdmin(true);
-        }
-      });
-  }
+  React.useEffect(() => {
+    firebase?.auth.onAuthStateChanged((user) => {
+      if (user) {
+        setLoggedIn(true);
+        firebase?.getUserDoc(user.uid).then((snapshot) => {
+          if (snapshot && snapshot.data()?.admin) {
+            setIsAdmin(true);
+            setAuthReady(true);
+          } else {
+            setAuthReady(true);
+          }
+        });
+      } else {
+        setLoggedIn(false);
+        setIsAdmin(false);
+        setAuthReady(true);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebase]);
 
   return (
     <React.Fragment>
@@ -68,12 +85,22 @@ function App({
         <Route path="/sign-up" component={SignUp} />
         <Route path="/vehicles/:id" component={VehicleView} />
         <Route path="/vehicles" component={Vehicles} />
-        <ProtectedRoute
+        <Route
           path="/admin"
-          isAuthenticated={isAdmin}
-          component={Admin}
-          authenticationPath="/login"
-          setRedirectUrl={(path) => setRedirectUrl(path)}
+          component={() => {
+            if (!authReady) {
+              return <h1 className="p-4">Loading...</h1>;
+            }
+            return (
+              <ProtectedRoute
+                path="/admin"
+                isAuthenticated={isAdmin}
+                component={Admin}
+                authenticationPath="/login"
+                setRedirectUrl={(path) => setRedirectUrl(path)}
+              />
+            );
+          }}
         />
         <Route
           path="/weekly-faq"
@@ -102,14 +129,15 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       loadFaqThread,
       setIsAdmin,
       setRedirectUrl,
+      setAuthReady,
     },
     dispatch
   );
 
 const mapStateToProps = (state: RootState) => ({
   faqThread: state.reddit.faqThread,
-  loggedIn: state.user.loggedIn,
   isAdmin: state.user.isAdmin,
+  authReady: state.user.authReady,
 });
 
 export default compose(
