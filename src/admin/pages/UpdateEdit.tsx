@@ -18,12 +18,22 @@ import { bindActionCreators, compose, Dispatch } from "redux";
 import Snoowrap from "snoowrap";
 import SearchInput, { SearchInputOption } from "../../components/SearchInput";
 import Firebase, { withFirebase } from "../../Firebase";
-import Update, { SaleItem, UpdateItem } from "../../models/update";
+import { Mission } from "../../models/mission";
+import Update, {
+  BonusActivity,
+  SaleItem,
+  UpdateItem
+} from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
-import { getVehiclesAsSearchInputOptions } from "../../store/selectors";
+import { setMissions } from "../../store/Missions";
+import {
+  getMissionsAsSearchInputOptions,
+  getVehiclesAsSearchInputOptions
+} from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
+import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
 
@@ -39,6 +49,9 @@ interface UpdateEditProps extends RouteComponentProps<UpdateEditMatch> {
   vehicles: Vehicle[];
   vehicleSearchInputOptions: SearchInputOption[];
   setVehicles: typeof setVehicles;
+  missions: Mission[];
+  missionSearchInputOptions: SearchInputOption[];
+  setMissions: typeof setMissions;
   redditClient: Snoowrap;
 }
 
@@ -82,6 +95,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     } else {
       this.setState({
         update: {
+          bonusActivities: [],
           new: [],
           sale: [],
           targetedSale: [],
@@ -93,6 +107,10 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
     if (!this.props.vehicles.length) {
       this.props.firebase!.getVehicles().then(this.props.setVehicles);
+    }
+
+    if (!this.props.missions.length) {
+      this.props.firebase!.getMissions().then(this.props.setMissions);
     }
   }
 
@@ -138,6 +156,35 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         [key]: [
           ...this.state.update![key].filter(
             (i: UpdateItem) => item.item.id !== i.item.id
+          ),
+        ],
+      },
+    });
+    this.debouncedSave();
+  };
+
+  setActivity = (activity: BonusActivity) => {
+    this.setState({
+      update: {
+        ...this.state.update!,
+        bonusActivities: [
+          ...this.state.update!.bonusActivities.filter(
+            (a: BonusActivity) => activity.activity.id !== a.activity.id
+          ),
+          activity,
+        ],
+      },
+    });
+    this.debouncedSave();
+  };
+
+  deleteActivity = (activity: BonusActivity) => {
+    this.setState({
+      update: {
+        ...this.state.update!,
+        bonusActivities: [
+          ...this.state.update!.bonusActivities.filter(
+            (a: BonusActivity) => activity.activity.id !== a.activity.id
           ),
         ],
       },
@@ -225,11 +272,11 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
         if (update.new.length) {
           groups.push(
-            "**New Content**\n" +
+            "**New Content**\n\n" +
               u.new
                 .map((item) =>
                   item.url
-                    ? ` - [${item.name}](${item.url})`
+                    ? ` - ${item.name} [↗](${item.url})`
                     : ` - ${item.name}`
                 )
                 .join("\n\n")
@@ -237,42 +284,68 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
         if (update.podium) {
           groups.push(
-            "**Podium Vehicle**\n" +
+            "**Podium Vehicle**\n\n" +
               (update.podium.url
-                ? ` - [${update.podium.name}](${update.podium.url})`
+                ? ` - ${update.podium.name} [↗](${update.podium.url})`
                 : ` - ${update.podium.name}`)
+          );
+        }
+        if (update.bonusActivities.length) {
+          groups.push(
+            "**Bonus GTA$ and RP Activities**\n\n" +
+              u.bonusActivities
+                .map((activity) => {
+                  const bonusString =
+                    activity.moneyAmount === activity.rpAmount
+                      ? activity.moneyAmount + "x GTA$ and RP"
+                      : activity.moneyAmount +
+                        "x GTA$ and " +
+                        activity.rpAmount +
+                        "x RP";
+
+                  return (
+                    " - " +
+                    bonusString +
+                    " on " +
+                    (activity.url
+                      ? `${activity.name} [↗](${activity.url})`
+                      : `${activity.name}`)
+                  );
+                })
+                .join("\n\n")
           );
         }
         if (update.sale.length) {
           groups.push(
-            "**Discounted Content**\n" + u.sale.map(getSaleString).join("\n\n")
+            "**Discounted Content**\n\n" +
+              u.sale.map(getSaleString).join("\n\n")
           );
         }
         if (update.twitchPrime.length) {
           groups.push(
-            "**Twitch Prime Bonuses**\n" +
+            "**Twitch Prime Bonuses**\n\n" +
               u.twitchPrime.map(getSaleString).join("\n\n")
           );
         }
         if (update.targetedSale.length) {
           groups.push(
-            "**Targeted Sales**\n" +
+            "**Targeted Sales**\n\n" +
               u.targetedSale.map(getSaleString).join("\n\n")
           );
         }
         if (update.timeTrial) {
           groups.push(
-            `**Time Trial**\n - [${update.timeTrial.name}](${update.timeTrial.url})`
+            `**Time Trial**\n\n - [${update.timeTrial.name}](${update.timeTrial.url})`
           );
         }
         if (update.rcTimeTrial) {
           groups.push(
-            `**RC Bandito Time Trial**\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
+            `**RC Bandito Time Trial**\n\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
           );
         }
         if (update.premiumRace) {
           groups.push(
-            `**Premium Race**\n - [${update.premiumRace.name}](${update.premiumRace.url})`
+            `**Premium Race**\n\n - [${update.premiumRace.name}](${update.premiumRace.url})`
           );
         }
 
@@ -307,7 +380,11 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
   // tslint:disable-next-line: max-func-body-length
   render() {
     const { update, updateExists, loading } = this.state;
-    const { match, vehicleSearchInputOptions } = this.props;
+    const {
+      match,
+      vehicleSearchInputOptions,
+      missionSearchInputOptions,
+    } = this.props;
 
     return (
       <Container fluid>
@@ -351,6 +428,26 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                         key={i.item!.id}
                         setItem={(item) => this.setItem("new", item)}
                         deleteItem={() => this.deleteItem("new", i)}
+                      />
+                    ))}
+                  </ListGroup>
+                </Form.Group>
+              </Form.Row>
+              <Form.Row className="my-2">
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Bonus GTA$ and RP Activities</Form.Label>
+                  <SearchInput
+                    multi
+                    options={missionSearchInputOptions}
+                    onSelect={(option) => this.setActivity(option.value)}
+                  />
+                  <ListGroup className="mt-2">
+                    {this.state.update?.bonusActivities?.map((a) => (
+                      <UpdateActivityEditor
+                        activity={a}
+                        key={a.activity!.id}
+                        setActivity={this.setActivity}
+                        deleteActivity={() => this.deleteActivity(a)}
                       />
                     ))}
                   </ListGroup>
@@ -562,6 +659,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       setUpdate,
       setUpdates,
       setVehicles,
+      setMissions,
     },
     dispatch
   );
@@ -570,6 +668,8 @@ const mapStateToProps = (state: RootState) => ({
   updates: state.updates.updates,
   vehicles: state.vehicles.vehicles,
   vehicleSearchInputOptions: getVehiclesAsSearchInputOptions(state),
+  missions: state.missions.missions,
+  missionSearchInputOptions: getMissionsAsSearchInputOptions(state),
   redditClient: state.reddit.redditClient,
 });
 

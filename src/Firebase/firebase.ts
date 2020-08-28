@@ -2,11 +2,12 @@ import app from "firebase/app";
 import "firebase/auth";
 import "firebase/firestore";
 import "firebase/functions";
+import { Mission } from "../models/mission";
 import Update from "../models/update";
 import { Vehicle } from "../models/vehicle";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAuQm6JQ5NtDuPcxcOskE9TieIWgeNVTr8",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: "gtaonline-cf0ea.firebaseapp.com",
   databaseURL: "https://gtaonline-cf0ea.firebaseio.com",
   projectId: "gtaonline-cf0ea",
@@ -53,6 +54,7 @@ class Firebase {
 
   getUserDoc = async (userId: string) => {
     const snapshot = await this.db.collection("users").doc(userId).get();
+
     if (snapshot?.exists) {
       return snapshot;
     }
@@ -68,6 +70,7 @@ class Firebase {
 
     return snapshot!.docs.map((doc) => ({
       ...(doc.data() as Update),
+      bonusActivities: doc.data()!.bonusActivities || [],
       date: new Date(doc.data()!.date.seconds * 1000),
       docRef: doc.ref,
     }));
@@ -87,6 +90,7 @@ class Firebase {
 
   getVehicle = async (id: string) => {
     const doc = await this.db.collection("vehicles").doc(id).get();
+
     if (doc.exists) {
       return {
         ...(doc.data() as Vehicle),
@@ -95,6 +99,15 @@ class Firebase {
     } else {
       return null;
     }
+  };
+
+  getMissions = async () => {
+    const snapshot = await this.db.collection("missions").orderBy("name").get();
+
+    return snapshot!.docs.map((doc) => ({
+      ...(doc.data() as Mission),
+      docRef: doc.ref,
+    }));
   };
 }
 
