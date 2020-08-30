@@ -15,6 +15,7 @@ import { RootState } from "../../store";
 import { setUpdates } from "../../store/Updates";
 import UpdateActivityElement from "./UpdateActivityElement";
 import UpdateItemElement from "./UpdateItemElement";
+import "./index.scss";
 
 interface UpdatesProps {
   firebase?: Firebase;
