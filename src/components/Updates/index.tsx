@@ -39,26 +39,6 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
   if (!loading) {
     return (
       <Container fluid="sm" className="justify-content-center">
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-            .background {
-              position: fixed;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              z-index: -100;
-              background-color: #f99c1c;
-              background-image: url("https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Rockstar_Games_Logo.svg/1113px-Rockstar_Games_Logo.svg.png");
-              background-size: 50px 50px;
-              opacity: 30%;
-            }
-
-            .yellow-overlay { display: none; }
-            `,
-          }}
-        />
         <div className="background" />
         {updates
           .sort((u1, u2) =>
