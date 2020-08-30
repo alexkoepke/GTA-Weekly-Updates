@@ -6,9 +6,38 @@
   bottom: 0;
   z-index: -100;
   background-color: #f99c1c;
-  background-image: url("https://wall.alphacoders.com/big.php?i=589959");
+  background-image: url("https://images.alphacoders.com/589/589959.jpg");
   background-size: cover;
+  background-position: center;
   opacity: 80%;
 }
 
-.yellow-overlay { display: none; }
+.update {
+  margin-bottom: 4rem;
+}
+
+/* set margin on external link icons so they 
+  may be used freely within .update */
+.update [data-icon="external-link-alt"] {
+  margin-left: 0.5rem;
+}
+
+.update-title {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.update-title__topic {
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.update-title__date {
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.update-title__link--text {
+  font-size: 0.9rem;
+}
