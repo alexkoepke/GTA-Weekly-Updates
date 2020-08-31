@@ -61,6 +61,7 @@ interface UpdateEditState {
   update?: Update;
   updateExists: boolean;
   loading: boolean;
+  unsubscribe: (() => void) | undefined;
 }
 
 class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
@@ -71,6 +72,99 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
       updateExists: true,
       loading: false,
     };
+  }
+
+  async componentDidUpdate(
+    prevProps: UpdateEditProps,
+    prevState: UpdateEditState
+  ) {
+    if (prevState.update !== this.state.update && !this.state.unsubscribe) {
+      const unsubscribe = this.state.update?.docRef?.onSnapshot((doc) => {
+        // last known server state
+        const storeUpdate = this.props.updates.filter(
+          (u) => u.docRef?.id === this.props.match.params.id
+        );
+        // latest server state, modified by other users
+        const newUpdate = {
+          ...(doc.data() as Update),
+          bonusActivities: doc.data()!.bonusActivities || [],
+          date: new Date(doc.data()!.date.seconds * 1000),
+          docRef: doc.ref,
+        };
+
+        const cleanChanges = (
+          storeCollection: (UpdateItem | BonusActivity)[],
+          updatedCollection: (UpdateItem | BonusActivity)[],
+          newCollection: (UpdateItem | BonusActivity)[]
+        ) => {
+          const storeIds = storeCollection.map(
+            (i) => (i as BonusActivity).activity.id || (i as UpdateItem).item.id
+          );
+          const updatedIds = updatedCollection.map(
+            (i) => (i as BonusActivity).activity.id || (i as UpdateItem).item.id
+          );
+
+          const resultCollection = updatedCollection.map((i) => {
+            const id =
+              (i as BonusActivity).activity.id || (i as UpdateItem).item.id;
+
+            const storeItem =
+              storeCollection.find((_i) => {
+                const _id =
+                  (_i as BonusActivity).activity.id ||
+                  (_i as UpdateItem).item.id;
+                return _id === id;
+              }) || {};
+
+            const newItem =
+              newCollection.find((_i) => {
+                const _id =
+                  (_i as BonusActivity).activity.id ||
+                  (_i as UpdateItem).item.id;
+                return _id === id;
+              }) || {};
+
+            const merge = (obj1: any, obj2: any, obj3: any) => {
+              for (let attr of obj1) {
+                obj1[attr] =
+                  obj2[attr] !== obj1[attr] ? obj2[attr] : obj3[attr];
+              }
+              return obj1;
+            };
+
+            return merge(storeItem, newItem, i);
+          });
+
+          resultCollection.push(
+            newCollection.filter((i) => {
+              const id =
+                (i as BonusActivity).activity.id || (i as UpdateItem).item.id;
+              return (
+                !(storeIds.includes(id) && !updatedIds.includes(id)) ||
+                !updatedIds.includes(id)
+              );
+            })
+          );
+
+          return resultCollection;
+        };
+
+        // merged update
+        const targetUpdate = {
+          ...this.state.update!,
+        };
+        this.setState({
+          update: targetUpdate,
+        });
+      });
+      this.setState({
+        unsubscribe,
+      });
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.state.unsubscribe) this.state.unsubscribe();
   }
 
   async componentDidMount() {
@@ -398,9 +492,9 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
       }
     }
-  }, 2000);
+  }, 250);
 
-  debouncedSave = _.debounce(this.saveUpdate, 5000);
+  debouncedSave = _.debounce(this.saveUpdate, 250);
 
   // tslint:disable-next-line: max-func-body-length
   render() {
