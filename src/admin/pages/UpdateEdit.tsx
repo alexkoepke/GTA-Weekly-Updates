@@ -75,24 +75,28 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
   async componentDidMount() {
     if (this.props.match.params.id) {
-      if (!this.props.updates.length) {
-        const u = await this.props.firebase!.getUpdates();
-        this.props.setUpdates(u);
-      }
-
       const update = this.props.updates.filter(
         (u) => u.docRef?.id === this.props.match.params.id
       );
-
       if (update.length) {
         this.setState({
           update: update[0],
         });
       } else {
-        this.setState({
-          updateExists: false,
-        });
-        return;
+        const u = await this.props.firebase!.getUpdate(
+          this.props.match.params.id
+        );
+        if (u) {
+          this.props.setUpdate(u);
+          this.setState({
+            update: u,
+          });
+        } else {
+          this.setState({
+            updateExists: false,
+          });
+          return;
+        }
       }
     } else {
       this.setState({
