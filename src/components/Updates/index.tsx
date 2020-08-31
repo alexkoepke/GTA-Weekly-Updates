@@ -82,7 +82,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                         <span
                           className="update-title__link--text"
                         >
-                          view on reddit
+                          /r/gtaonline
                         </span>
                         <FontAwesomeIcon icon={faExternalLinkAlt} />
                       </Button>
@@ -94,7 +94,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                   <section className="update-section update-section__podium-vehicle">
                     <b>Podium Vehicle</b>
                     <br />
-                    <ul className="update-list">
+                    <ul className="update-item-list">
                       <UpdateItemElement
                         key={update.podium.item.id}
                         item={update.podium}
@@ -105,7 +105,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                 {update.new.length !== 0 && (
                   <section className="update-section update-section__new-content">
                     <b>New Content</b>
-                    <ul className="update-list">
+                    <ul className="update-item-list">
                       {update.new.map((item: UpdateItem) => (
                         <UpdateItemElement key={item.item.id} item={item} />
                       ))}
@@ -115,7 +115,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                 {update.bonusActivities.length !== 0 && (
                   <section className="update-section update-section__bonus-activites">
                     <b>Bonus GTA$ and RP Activities</b>
-                    <ul className="update-list">
+                    <ul className="update-item-list">
                       {update.bonusActivities.map((activity: BonusActivity) => (
                         <UpdateActivityElement
                           key={activity.activity.id}
@@ -128,7 +128,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                 {update.sale.length !== 0 && (
                   <section className="update-section update-section__discounts">
                     <b>Discounts</b>
-                    <ul className="update-list">
+                    <ul className="update-item-list">
                       {update.sale.map((item: SaleItem) => (
                         <UpdateItemElement key={item.item.id} item={item} />
                       ))}
@@ -138,7 +138,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                 {update.twitchPrime.length !== 0 && (
                   <section className="update-section update-section__twitch-prime">
                     <b>Twitch Prime Bonuses</b>
-                    <ul className="update-list">
+                    <ul className="update-item-list">
                       {update.twitchPrime.map((item: SaleItem) => (
                         <UpdateItemElement key={item.item.id} item={item} />
                       ))}
@@ -148,7 +148,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                 {update.targetedSale.length !== 0 && (
                   <section className="update-section update-section__targeted-sales">
                     <b>Targeted Sales</b>
-                    <ul className="update-list">
+                    <ul className="update-item-list">
                       {update.targetedSale.map((item: SaleItem) => (
                         <UpdateItemElement key={item.item.id} item={item} />
                       ))}
