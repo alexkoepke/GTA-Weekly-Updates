@@ -1,4 +1,4 @@
-import firebase from "firebase";
+import firebase from "firebase/app";
 import _ from "lodash";
 import React from "react";
 import {
@@ -15,15 +15,26 @@ import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
 import { RouteComponentProps } from "react-router";
 import { bindActionCreators, compose, Dispatch } from "redux";
-import Snoowrap from "snoowrap";
+import Snoowrap, { SnoowrapOptions } from "snoowrap";
 import SearchInput, { SearchInputOption } from "../../components/SearchInput";
 import Firebase, { withFirebase } from "../../Firebase";
-import Update, { SaleItem, UpdateItem } from "../../models/update";
+import { Mission } from "../../models/mission";
+import Update, {
+  BonusActivity,
+  SaleItem,
+  UpdateItem
+} from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
-import { getVehiclesAsSearchInputOptions } from "../../store/selectors";
+import { setMissions } from "../../store/Missions";
+import { setRedditClient } from "../../store/Reddit";
+import {
+  getMissionsAsSearchInputOptions,
+  getVehiclesAsSearchInputOptions
+} from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
+import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
 
@@ -39,13 +50,18 @@ interface UpdateEditProps extends RouteComponentProps<UpdateEditMatch> {
   vehicles: Vehicle[];
   vehicleSearchInputOptions: SearchInputOption[];
   setVehicles: typeof setVehicles;
+  missions: Mission[];
+  missionSearchInputOptions: SearchInputOption[];
+  setMissions: typeof setMissions;
   redditClient: Snoowrap;
+  setRedditClient: typeof setRedditClient;
 }
 
 interface UpdateEditState {
   update?: Update;
   updateExists: boolean;
   loading: boolean;
+  unsubscribe: (() => void) | undefined;
 }
 
 class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
@@ -58,30 +74,128 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     };
   }
 
+  async componentDidUpdate(
+    prevProps: UpdateEditProps,
+    prevState: UpdateEditState
+  ) {
+    if (prevState.update !== this.state.update && !this.state.unsubscribe) {
+      const unsubscribe = this.state.update?.docRef?.onSnapshot((doc) => {
+        // last known server state
+        const storeUpdate = this.props.updates.filter(
+          (u) => u.docRef?.id === this.props.match.params.id
+        );
+        // latest server state, modified by other users
+        const newUpdate = {
+          ...(doc.data() as Update),
+          bonusActivities: doc.data()!.bonusActivities || [],
+          date: new Date(doc.data()!.date.seconds * 1000),
+          docRef: doc.ref,
+        };
+
+        const cleanChanges = (
+          storeCollection: (UpdateItem | BonusActivity)[],
+          updatedCollection: (UpdateItem | BonusActivity)[],
+          newCollection: (UpdateItem | BonusActivity)[]
+        ) => {
+          const storeIds = storeCollection.map(
+            (i) => (i as BonusActivity).activity.id || (i as UpdateItem).item.id
+          );
+          const updatedIds = updatedCollection.map(
+            (i) => (i as BonusActivity).activity.id || (i as UpdateItem).item.id
+          );
+
+          const resultCollection = updatedCollection.map((i) => {
+            const id =
+              (i as BonusActivity).activity.id || (i as UpdateItem).item.id;
+
+            const storeItem =
+              storeCollection.find((_i) => {
+                const _id =
+                  (_i as BonusActivity).activity.id ||
+                  (_i as UpdateItem).item.id;
+                return _id === id;
+              }) || {};
+
+            const newItem =
+              newCollection.find((_i) => {
+                const _id =
+                  (_i as BonusActivity).activity.id ||
+                  (_i as UpdateItem).item.id;
+                return _id === id;
+              }) || {};
+
+            const merge = (obj1: any, obj2: any, obj3: any) => {
+              for (let attr of obj1) {
+                obj1[attr] =
+                  obj2[attr] !== obj1[attr] ? obj2[attr] : obj3[attr];
+              }
+              return obj1;
+            };
+
+            return merge(storeItem, newItem, i);
+          });
+
+          resultCollection.push(
+            newCollection.filter((i) => {
+              const id =
+                (i as BonusActivity).activity.id || (i as UpdateItem).item.id;
+              return (
+                !(storeIds.includes(id) && !updatedIds.includes(id)) ||
+                !updatedIds.includes(id)
+              );
+            })
+          );
+
+          return resultCollection;
+        };
+
+        // merged update
+        const targetUpdate = {
+          ...this.state.update!,
+        };
+        this.setState({
+          update: targetUpdate,
+        });
+      });
+      this.setState({
+        unsubscribe,
+      });
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.state.unsubscribe) this.state.unsubscribe();
+  }
+
   async componentDidMount() {
     if (this.props.match.params.id) {
-      if (!this.props.updates.length) {
-        const u = await this.props.firebase!.getUpdates();
-        this.props.setUpdates(u);
-      }
-
       const update = this.props.updates.filter(
         (u) => u.docRef?.id === this.props.match.params.id
       );
-
       if (update.length) {
         this.setState({
           update: update[0],
         });
       } else {
-        this.setState({
-          updateExists: false,
-        });
-        return;
+        const u = await this.props.firebase!.getUpdate(
+          this.props.match.params.id
+        );
+        if (u) {
+          this.props.setUpdate(u);
+          this.setState({
+            update: u,
+          });
+        } else {
+          this.setState({
+            updateExists: false,
+          });
+          return;
+        }
       }
     } else {
       this.setState({
         update: {
+          bonusActivities: [],
           new: [],
           sale: [],
           targetedSale: [],
@@ -93,6 +207,22 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
     if (!this.props.vehicles.length) {
       this.props.firebase!.getVehicles().then(this.props.setVehicles);
+    }
+
+    if (!this.props.missions.length) {
+      this.props.firebase!.getMissions().then(this.props.setMissions);
+    }
+
+    if (!this.props.redditClient) {
+      this.props
+        .firebase!.db.collection("configs")
+        .doc("reddit")
+        .get()
+        .then((snapshot) =>
+          this.props.setRedditClient(
+            new Snoowrap({ ...(snapshot.data()! as SnoowrapOptions) })
+          )
+        );
     }
   }
 
@@ -145,6 +275,35 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     this.debouncedSave();
   };
 
+  setActivity = (activity: BonusActivity) => {
+    this.setState({
+      update: {
+        ...this.state.update!,
+        bonusActivities: [
+          ...this.state.update!.bonusActivities.filter(
+            (a: BonusActivity) => activity.activity.id !== a.activity.id
+          ),
+          activity,
+        ],
+      },
+    });
+    this.debouncedSave();
+  };
+
+  deleteActivity = (activity: BonusActivity) => {
+    this.setState({
+      update: {
+        ...this.state.update!,
+        bonusActivities: [
+          ...this.state.update!.bonusActivities.filter(
+            (a: BonusActivity) => activity.activity.id !== a.activity.id
+          ),
+        ],
+      },
+    });
+    this.debouncedSave();
+  };
+
   saveUpdate = _.throttle(() => {
     if (this.state.update) {
       const { docRef, ...u } = this.state.update;
@@ -153,8 +312,6 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         ...u,
         date: firebase.firestore.Timestamp.fromDate(u.date),
       };
-
-      console.log(update);
 
       this.setState({
         loading: true,
@@ -206,80 +363,114 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
       };
 
+      const getSaleString = (item: SaleItem) => {
+        const getPriceString = (price: number, saleAmount: number) =>
+          (price * (1 - saleAmount / 100)).toLocaleString("en-US");
+        let priceString = "";
+        if (item.price) {
+          priceString = item.tradePrice
+            ? ` (GTA$ ${getPriceString(
+                item.price,
+                item.amount
+              )} / ${getPriceString(item.tradePrice, item.amount)})`
+            : ` (GTA$ ${getPriceString(item.price, item.amount)})`;
+        } else if (item.minPrice && item.maxPrice) {
+          priceString = ` (GTA$ ${getPriceString(
+            item.minPrice,
+            item.amount
+          )} - ${getPriceString(item.maxPrice, item.amount)})`;
+        }
+
+        return item.url
+          ? ` - ${item.amount}% off ${item.name}${priceString} [↗](${item.url})`
+          : ` - ${item.amount}% off ${item.name}${priceString}`;
+      };
+
       if (this.props.redditClient) {
         const groups: string[] = [];
 
         if (update.new.length) {
           groups.push(
-            "**New Content**\n" +
+            "**New Content**\n\n" +
               u.new
                 .map((item) =>
                   item.url
-                    ? ` - [${item.name}](${item.url})`
+                    ? ` - ${item.name} [↗](${item.url})`
                     : ` - ${item.name}`
                 )
-                .join("\n")
+                .join("\n\n")
           );
         }
         if (update.podium) {
           groups.push(
-            "**Podium Vehicle**\n" +
+            "**Podium Vehicle**\n\n" +
               (update.podium.url
-                ? ` - [${update.podium.name}](${update.podium.url})`
+                ? ` - ${update.podium.name} [↗](${update.podium.url})`
                 : ` - ${update.podium.name}`)
+          );
+        }
+        if (update.bonusActivities.length) {
+          groups.push(
+            "**Bonus GTA$ and RP Activities**\n\n" +
+              u.bonusActivities
+                .map((activity) => {
+                  const bonusString =
+                    activity.moneyAmount === activity.rpAmount
+                      ? activity.moneyAmount + "x GTA$ and RP"
+                      : activity.moneyAmount +
+                        "x GTA$ and " +
+                        activity.rpAmount +
+                        "x RP";
+
+                  return (
+                    " - " +
+                    bonusString +
+                    " on " +
+                    (activity.url
+                      ? `${activity.name} [↗](${activity.url})`
+                      : `${activity.name}`)
+                  );
+                })
+                .join("\n\n")
           );
         }
         if (update.sale.length) {
           groups.push(
-            "**Discounted Content**\n" +
-              u.sale
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
-                    : ` - ${item.amount}% off ${item.name}`
-                )
-                .join("\n")
+            "**Discounted Content**\n\n" +
+              u.sale.map(getSaleString).join("\n\n")
           );
         }
         if (update.twitchPrime.length) {
           groups.push(
-            "**Twitch Prime Bonuses**\n" +
-              u.twitchPrime
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
-                    : ` - ${item.amount}% off ${item.name}`
-                )
-                .join("\n")
+            "**Twitch Prime Bonuses**\n\n" +
+              u.twitchPrime.map(getSaleString).join("\n\n")
           );
         }
         if (update.targetedSale.length) {
           groups.push(
-            "**Targeted Sales**\n" +
-              u.targetedSale
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.amount}% off [${item.name}](${item.url})`
-                    : ` - ${item.amount}% off ${item.name}`
-                )
-                .join("\n")
+            "**Targeted Sales**\n\n" +
+              u.targetedSale.map(getSaleString).join("\n\n")
           );
         }
         if (update.timeTrial) {
           groups.push(
-            `**Time Trial**\n - [${update.timeTrial.name}](${update.timeTrial.url})`
+            `**Time Trial**\n\n - [${update.timeTrial.name}](${update.timeTrial.url})`
           );
         }
         if (update.rcTimeTrial) {
           groups.push(
-            `**RC Bandito Time Trial**\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
+            `**RC Bandito Time Trial**\n\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
           );
         }
         if (update.premiumRace) {
           groups.push(
-            `**Premium Race**\n - [${update.premiumRace.name}](${update.premiumRace.url})`
+            `**Premium Race**\n\n - [${update.premiumRace.name}](${update.premiumRace.url})`
           );
         }
+
+        groups.push(
+          "View embedded updates [here](https://gtaonline-cf0ea.web.app/)."
+        );
 
         if (!update.redditThread) {
           this.props.redditClient
@@ -301,14 +492,18 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
       }
     }
-  }, 2000);
+  }, 250);
 
-  debouncedSave = _.debounce(this.saveUpdate, 5000);
+  debouncedSave = _.debounce(this.saveUpdate, 250);
 
   // tslint:disable-next-line: max-func-body-length
   render() {
     const { update, updateExists, loading } = this.state;
-    const { match, vehicleSearchInputOptions } = this.props;
+    const {
+      match,
+      vehicleSearchInputOptions,
+      missionSearchInputOptions,
+    } = this.props;
 
     return (
       <Container fluid>
@@ -352,6 +547,26 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                         key={i.item!.id}
                         setItem={(item) => this.setItem("new", item)}
                         deleteItem={() => this.deleteItem("new", i)}
+                      />
+                    ))}
+                  </ListGroup>
+                </Form.Group>
+              </Form.Row>
+              <Form.Row className="my-2">
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Bonus GTA$ and RP Activities</Form.Label>
+                  <SearchInput
+                    multi
+                    options={missionSearchInputOptions}
+                    onSelect={(option) => this.setActivity(option.value)}
+                  />
+                  <ListGroup className="mt-2">
+                    {this.state.update?.bonusActivities?.map((a) => (
+                      <UpdateActivityEditor
+                        activity={a}
+                        key={a.activity!.id}
+                        setActivity={this.setActivity}
+                        deleteActivity={() => this.deleteActivity(a)}
                       />
                     ))}
                   </ListGroup>
@@ -563,6 +778,8 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       setUpdate,
       setUpdates,
       setVehicles,
+      setMissions,
+      setRedditClient,
     },
     dispatch
   );
@@ -571,6 +788,8 @@ const mapStateToProps = (state: RootState) => ({
   updates: state.updates.updates,
   vehicles: state.vehicles.vehicles,
   vehicleSearchInputOptions: getVehiclesAsSearchInputOptions(state),
+  missions: state.missions.missions,
+  missionSearchInputOptions: getMissionsAsSearchInputOptions(state),
   redditClient: state.reddit.redditClient,
 });
 

@@ -1,8 +1,9 @@
-import firebase from "firebase";
+import firebase from "firebase/app";
 
 export default interface Update {
   [name: string]: any;
   podium?: UpdateItem;
+  bonusActivities: BonusActivity[];
   new: UpdateItem[];
   sale: SaleItem[];
   targetedSale: SaleItem[];
@@ -13,6 +14,17 @@ export default interface Update {
   premiumRace?: Race;
   timeTrial?: TimeTrial;
   rcTimeTrial?: TimeTrial;
+}
+
+export interface BonusActivity {
+  name: string;
+  url?: string;
+  pay?: number;
+  minPay?: number;
+  maxPay?: number;
+  moneyAmount: number;
+  rpAmount: number;
+  activity: firebase.firestore.DocumentReference;
 }
 
 export interface Race {
@@ -32,10 +44,12 @@ export interface SaleItem extends UpdateItem {
 export interface UpdateItem {
   [name: string]: any;
   name: string;
-  price: number;
-  tradePrice: number;
+  price?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  tradePrice?: number;
   img?: string;
   shop?: string;
-  item: firebase.firestore.DocumentReference;
   url?: string;
+  item: firebase.firestore.DocumentReference;
 }

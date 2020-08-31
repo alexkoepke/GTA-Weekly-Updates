@@ -15,6 +15,13 @@ function UpdateItemEditor({
   setItem,
   deleteItem,
 }: UpdateItemEditorProps) {
+  const price = [
+    item.price,
+    item.tradePrice,
+    item.minPrice,
+    item.maxPrice,
+  ].find((x) => x != null);
+
   return (
     <ListGroup.Item className="p-0">
       <InputGroup>
@@ -36,6 +43,15 @@ function UpdateItemEditor({
         )}
         <InputGroup.Append>
           {sale && <InputGroup.Text>%</InputGroup.Text>}
+          {sale && (
+            <InputGroup.Text>
+              GTA${" "}
+              {price && (
+                price *
+                (1 - (item as SaleItem).amount / 100)
+              ).toLocaleString()}
+            </InputGroup.Text>
+          )}
           <Button
             variant="secondary"
             onClick={deleteItem}
