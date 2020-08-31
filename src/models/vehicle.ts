@@ -1,8 +1,8 @@
-import firebase from "firebase";
+import firebase from "firebase/app";
 
 export interface Vehicle {
   img?: string;
-  manufacturer?: string;
+  manufacturer: string;
   name: string;
   price?: number;
   tradePrice?: number;

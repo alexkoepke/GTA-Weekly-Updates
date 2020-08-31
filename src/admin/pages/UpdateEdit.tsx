@@ -1,4 +1,4 @@
-import firebase from "firebase";
+import firebase from "firebase/app";
 import _ from "lodash";
 import React from "react";
 import {
@@ -15,7 +15,7 @@ import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
 import { RouteComponentProps } from "react-router";
 import { bindActionCreators, compose, Dispatch } from "redux";
-import Snoowrap from "snoowrap";
+import Snoowrap, { SnoowrapOptions } from "snoowrap";
 import SearchInput, { SearchInputOption } from "../../components/SearchInput";
 import Firebase, { withFirebase } from "../../Firebase";
 import { Mission } from "../../models/mission";
@@ -27,6 +27,7 @@ import Update, {
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
 import { setMissions } from "../../store/Missions";
+import { setRedditClient } from "../../store/Reddit";
 import {
   getMissionsAsSearchInputOptions,
   getVehiclesAsSearchInputOptions
@@ -53,6 +54,7 @@ interface UpdateEditProps extends RouteComponentProps<UpdateEditMatch> {
   missionSearchInputOptions: SearchInputOption[];
   setMissions: typeof setMissions;
   redditClient: Snoowrap;
+  setRedditClient: typeof setRedditClient;
 }
 
 interface UpdateEditState {
@@ -111,6 +113,18 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
 
     if (!this.props.missions.length) {
       this.props.firebase!.getMissions().then(this.props.setMissions);
+    }
+
+    if (!this.props.redditClient) {
+      this.props
+        .firebase!.db.collection("configs")
+        .doc("reddit")
+        .get()
+        .then((snapshot) =>
+          this.props.setRedditClient(
+            new Snoowrap({ ...(snapshot.data()! as SnoowrapOptions) })
+          )
+        );
     }
   }
 
@@ -201,8 +215,6 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         date: firebase.firestore.Timestamp.fromDate(u.date),
       };
 
-      console.log(update);
-
       this.setState({
         loading: true,
       });
@@ -256,15 +268,24 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
       const getSaleString = (item: SaleItem) => {
         const getPriceString = (price: number, saleAmount: number) =>
           (price * (1 - saleAmount / 100)).toLocaleString("en-US");
-        const priceString = item.tradePrice
-          ? `(GTA$ ${getPriceString(
-              item.price,
-              item.amount
-            )} / ${getPriceString(item.tradePrice, item.amount)})`
-          : `(GTA$ ${getPriceString(item.price, item.amount)})`;
+        let priceString = "";
+        if (item.price) {
+          priceString = item.tradePrice
+            ? ` (GTA$ ${getPriceString(
+                item.price,
+                item.amount
+              )} / ${getPriceString(item.tradePrice, item.amount)})`
+            : ` (GTA$ ${getPriceString(item.price, item.amount)})`;
+        } else if (item.minPrice && item.maxPrice) {
+          priceString = ` (GTA$ ${getPriceString(
+            item.minPrice,
+            item.amount
+          )} - ${getPriceString(item.maxPrice, item.amount)})`;
+        }
+
         return item.url
-          ? ` - ${item.amount}% off ${item.name} ${priceString} [↗](${item.url})`
-          : ` - ${item.amount}% off ${item.name} ${priceString}`;
+          ? ` - ${item.amount}% off ${item.name}${priceString} [↗](${item.url})`
+          : ` - ${item.amount}% off ${item.name}${priceString}`;
       };
 
       if (this.props.redditClient) {
@@ -660,6 +681,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       setUpdates,
       setVehicles,
       setMissions,
+      setRedditClient,
     },
     dispatch
   );

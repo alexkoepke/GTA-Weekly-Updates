@@ -1,4 +1,4 @@
-import firebase from "firebase";
+import firebase from "firebase/app";
 import _ from "lodash";
 import React from "react";
 import { Button, Col, Container, Form, Image, Spinner } from "react-bootstrap";
@@ -75,7 +75,7 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
       }
     } else {
       this.setState({
-        vehicle: { name: "", shop: shops[0] },
+        vehicle: { name: "", shop: shops[0], manufacturer: "" },
       });
     }
   }
@@ -95,7 +95,7 @@ class VehicleEdit extends React.Component<VehicleEditProps, VehicleEditState> {
     this.setState({
       vehicle: {
         ...this.state.vehicle!!,
-        [name]: type === "number" ? parseInt(value) : value,
+        [name]: type === "number" && value ? parseInt(value) : value,
       },
     });
     this.debouncedSave();
