@@ -6,12 +6,18 @@ export function mergeObject<T>(obj1: T, obj2: T, obj3: T): T {
   };
 
   for (let attr of Object.keys(returnObj)) {
-    (returnObj as any)[attr] =
+    let val =
       (obj2 as any)[attr] !== (obj1 as any)[attr]
         ? (obj2 as any)[attr]
         : (obj3 as any)[attr] !== undefined
         ? (obj3 as any)[attr]
         : (obj1 as any)[attr];
+
+    if (val) {
+      (returnObj as any)[attr] = val;
+    } else if (!(returnObj as any)[attr]) {
+      delete (returnObj as any)[attr];
+    }
   }
 
   return returnObj;
@@ -24,50 +30,46 @@ export function mergeArrays<T>(
   remoteCollection: T[],
   uniqueIdentifier: (item: T) => string | number
 ): T[] {
-  const oldIds = oldCollection.map((i) => uniqueIdentifier(i));
-  const updatedIds = updatedCollection.map((i) => uniqueIdentifier(i));
-  const remoteIds = remoteCollection.map((i) => uniqueIdentifier(i));
+  const oldIds = oldCollection.map(uniqueIdentifier);
+  const updatedIds = updatedCollection.map(uniqueIdentifier);
+  const remoteIds = remoteCollection.map(uniqueIdentifier);
 
   const remoteRemovals = oldIds.filter((i) => !remoteIds.includes(i));
+
   const localUpdates = updatedCollection
     .filter((i) => {
       const id = uniqueIdentifier(i);
-      const oldItem = oldCollection.find((_i) => {
-        const _id = uniqueIdentifier(i);
-        return _id === id;
-      });
+      const oldItem = oldCollection.find((_i) => uniqueIdentifier(_i) === id);
       if (oldItem) {
         for (let attr of Object.keys(oldItem).concat(Object.keys(i))) {
           if ((i as any)[attr] !== (oldItem as any)[attr]) {
             return true;
           }
         }
+      } else {
+        return true;
       }
       return false;
     })
-    .map((i) => uniqueIdentifier(i));
+    .map(uniqueIdentifier);
 
   const resultCollection = updatedCollection
     .filter(
       (i) =>
         localUpdates.includes(uniqueIdentifier(i)) ||
-        !remoteRemovals.includes(uniqueIdentifier(i)) ||
-        !(
-          localUpdates.includes(uniqueIdentifier(i)) &&
-          remoteRemovals.includes(uniqueIdentifier(i))
-        )
+        !remoteRemovals.includes(uniqueIdentifier(i))
     )
     .map((i) => {
       const id = uniqueIdentifier(i);
       const oldItem =
         oldCollection.find((_i) => {
-          const _id = uniqueIdentifier(i);
+          const _id = uniqueIdentifier(_i);
           return _id === id;
         }) || {};
 
       const remoteItem =
         remoteCollection.find((_i) => {
-          const _id = uniqueIdentifier(i);
+          const _id = uniqueIdentifier(_i);
           return _id === id;
         }) || {};
 

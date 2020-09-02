@@ -9,7 +9,7 @@ import {
   FormControl,
   InputGroup,
   ListGroup,
-  Spinner
+  Spinner,
 } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
@@ -22,7 +22,7 @@ import { Mission } from "../../models/mission";
 import Update, {
   BonusActivity,
   SaleItem,
-  UpdateItem
+  UpdateItem,
 } from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
@@ -30,7 +30,7 @@ import { setMissions } from "../../store/Missions";
 import { setRedditClient } from "../../store/Reddit";
 import {
   getMissionsAsSearchInputOptions,
-  getVehiclesAsSearchInputOptions
+  getVehiclesAsSearchInputOptions,
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
@@ -169,12 +169,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
             newUpdate.redditThread,
         };
 
-        this.setState(
-          {
-            update: targetUpdate as Update,
-          },
-          this.saveUpdate
-        );
+        this.setState({ update: targetUpdate as Update });
       });
       this.setState({
         unsubscribe,
@@ -347,8 +342,6 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         })
           .omitBy(_.isUndefined)
           .value();
-
-        console.log(cleanedUpdate);
 
         if (docRef) {
           docRef!
@@ -749,7 +742,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                       <InputGroup.Text>Premium Race</InputGroup.Text>
                     </InputGroup.Prepend>
                     <FormControl
-                      value={update.premiumRace?.url}
+                      value={update.premiumRace?.name}
                       placeholder="Name"
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                         this.setValue("premiumRace", {
