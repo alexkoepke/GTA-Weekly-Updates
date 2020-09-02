@@ -120,15 +120,6 @@ class Firebase {
       docRef: doc.ref,
     }));
   };
-
-  getMissions = async () => {
-    const snapshot = await this.db.collection("missions").orderBy("name").get();
-
-    return snapshot!.docs.map((doc) => ({
-      ...(doc.data() as Mission),
-      docRef: doc.ref,
-    }));
-  };
 }
 
 export default Firebase;
