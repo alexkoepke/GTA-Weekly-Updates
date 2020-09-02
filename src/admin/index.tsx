@@ -11,7 +11,7 @@ import VehicleEdit from "./pages/VehicleEdit";
 
 function Admin() {
   return (
-    <Container fluid className="p-0 h-100">
+    <Container fluid className="p-0 h-100 admin">
       <Row className="h-100 align-items-stretch">
         <Col md={3} sm={12} lg={2}>
           <Nav className="flex-md-column admin-nav h-100 p-2">
