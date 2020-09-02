@@ -87,3 +87,13 @@ export function mergeArrays<T>(
   );
   return resultCollection;
 }
+
+export function safeInt(input: string, fallback: number, returnEmpty = true) {
+  if (!isNaN(parseInt(input))) {
+    return parseInt(input);
+  } else if (returnEmpty && !input) {
+    return 0;
+  } else {
+    return fallback;
+  }
+}
