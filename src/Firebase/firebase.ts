@@ -70,9 +70,23 @@ class Firebase {
 
     return snapshot!.docs.map((doc) => ({
       ...(doc.data() as Update),
+      bonusActivities: doc.data()!.bonusActivities || [],
       date: new Date(doc.data()!.date.seconds * 1000),
       docRef: doc.ref,
     }));
+  };
+
+  getUpdate = async (id: string) => {
+    const doc = await this.db.collection("updates").doc(id).get();
+
+    return (
+      doc.exists && {
+        ...(doc.data() as Update),
+        bonusActivities: doc.data()!.bonusActivities || [],
+        date: new Date(doc.data()!.date.seconds * 1000),
+        docRef: doc.ref,
+      }
+    );
   };
 
   getVehicles = async () => {
@@ -90,14 +104,21 @@ class Firebase {
   getVehicle = async (id: string) => {
     const doc = await this.db.collection("vehicles").doc(id).get();
 
-    if (doc.exists) {
-      return {
+    return (
+      doc.exists && {
         ...(doc.data() as Vehicle),
         docRef: doc.ref,
-      };
-    } else {
-      return null;
-    }
+      }
+    );
+  };
+
+  getMissions = async () => {
+    const snapshot = await this.db.collection("missions").orderBy("name").get();
+
+    return snapshot!.docs.map((doc) => ({
+      ...(doc.data() as Mission),
+      docRef: doc.ref,
+    }));
   };
 
   getMissions = async () => {

@@ -1,11 +1,11 @@
-import { faExternalLinkAlt, faEye } from "@fortawesome/free-solid-svg-icons";
+import { faExternalLinkAlt, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import React from "react";
 import { Button, Image, Modal } from "react-bootstrap";
 import { SaleItem, UpdateItem } from "../../models/update";
 
 interface UpdateItemCardProps {
-  item: UpdateItem;
+  item: UpdateItem | SaleItem;
 }
 
 function UpdateItemElement({ item }: UpdateItemCardProps) {
@@ -17,10 +17,12 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
   return (
     <React.Fragment>
       <li onClick={handleShow}>
-        {(item as SaleItem).amount
-          ? `${(item as SaleItem).amount}% off ${item.name}`
-          : item.name}{" "}
-        <FontAwesomeIcon icon={faEye} />
+        <FontAwesomeIcon icon={faInfoCircle} />
+        <span>
+          {(item as SaleItem).amount
+            ? `${item.name} - ${(item as SaleItem).amount}% off`
+            : item.name}{" "}
+        </span>
       </li>
       <Modal show={show} onHide={handleClose} centered>
         <Modal.Header closeButton>
@@ -31,11 +33,15 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
           <p>
             {(item as SaleItem).amount ? (
               <span>
-                <del>GTA$ {item.price.toLocaleString()}</del> GTA${" "}
-                {(
-                  item.price *
-                  (1 - (item as SaleItem).amount / 100)
-                ).toLocaleString()}
+                {item.price && (
+                  <span>
+                    <del>GTA$ {item.price.toLocaleString()}</del> GTA${" "}
+                    {(
+                      item.price *
+                      (1 - (item as SaleItem).amount / 100)
+                    ).toLocaleString()}
+                  </span>
+                )}
                 {item.tradePrice && (
                   <span>
                     <br />
@@ -49,7 +55,17 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
                 )}
               </span>
             ) : (
-              <span>GTA$ {item.price.toLocaleString()}</span>
+              <span>
+                {item.price && "GTA$ " + item.price.toLocaleString()}
+                {item.tradePrice &&
+                  "\nGTA$ " + item.tradePrice.toLocaleString()}
+                {item.minPrice &&
+                  item.maxPrice &&
+                  "\nGTA$ " +
+                    item.minPrice.toLocaleString() +
+                    " - GTA$ " +
+                    item.maxPrice.toLocaleString()}
+              </span>
             )}
             {item.shop && (
               <span className="pt-2 mt-2">
