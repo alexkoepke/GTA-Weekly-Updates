@@ -34,6 +34,7 @@ import {
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
+import { mergeArrays, mergeObject } from "../../utils";
 import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
@@ -61,7 +62,8 @@ interface UpdateEditState {
   update?: Update;
   updateExists: boolean;
   loading: boolean;
-  unsubscribe: (() => void) | undefined;
+  unsubscribe?: () => void;
+  handledInitialSnapshot: boolean;
 }
 
 class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
@@ -71,17 +73,22 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     this.state = {
       updateExists: true,
       loading: false,
+      handledInitialSnapshot: false,
     };
   }
 
   async componentDidUpdate(
-    prevProps: UpdateEditProps,
+    _prevProps: UpdateEditProps,
     prevState: UpdateEditState
   ) {
     if (prevState.update !== this.state.update && !this.state.unsubscribe) {
       const unsubscribe = this.state.update?.docRef?.onSnapshot((doc) => {
+        if (!this.state.handledInitialSnapshot) {
+          this.setState({ handledInitialSnapshot: true });
+          return;
+        }
         // last known server state
-        const storeUpdate = this.props.updates.filter(
+        const storeUpdate = this.props.updates.find(
           (u) => u.docRef?.id === this.props.match.params.id
         );
         // latest server state, modified by other users
@@ -92,70 +99,82 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
           docRef: doc.ref,
         };
 
-        const cleanChanges = (
-          storeCollection: (UpdateItem | BonusActivity)[],
-          updatedCollection: (UpdateItem | BonusActivity)[],
-          newCollection: (UpdateItem | BonusActivity)[]
-        ) => {
-          const storeIds = storeCollection.map(
-            (i) => (i as BonusActivity).activity.id || (i as UpdateItem).item.id
-          );
-          const updatedIds = updatedCollection.map(
-            (i) => (i as BonusActivity).activity.id || (i as UpdateItem).item.id
-          );
+        const podium = mergeObject(
+          storeUpdate?.podium || {},
+          this.state.update!.podium || {},
+          newUpdate.podium || {}
+        );
 
-          const resultCollection = updatedCollection.map((i) => {
-            const id =
-              (i as BonusActivity).activity.id || (i as UpdateItem).item.id;
+        const timeTrial = mergeObject(
+          storeUpdate?.timeTrial || {},
+          this.state.update!.timeTrial || {},
+          newUpdate.timeTrial || {}
+        );
 
-            const storeItem =
-              storeCollection.find((_i) => {
-                const _id =
-                  (_i as BonusActivity).activity.id ||
-                  (_i as UpdateItem).item.id;
-                return _id === id;
-              }) || {};
+        const rcTimeTrial = mergeObject(
+          storeUpdate?.rcTimeTrial || {},
+          this.state.update!.rcTimeTrial || {},
+          newUpdate.rcTimeTrial || {}
+        );
 
-            const newItem =
-              newCollection.find((_i) => {
-                const _id =
-                  (_i as BonusActivity).activity.id ||
-                  (_i as UpdateItem).item.id;
-                return _id === id;
-              }) || {};
+        const premiumRace = mergeObject(
+          storeUpdate?.premiumRace || {},
+          this.state.update!.premiumRace || {},
+          newUpdate.premiumRace || {}
+        );
 
-            const merge = (obj1: any, obj2: any, obj3: any) => {
-              for (let attr of obj1) {
-                obj1[attr] =
-                  obj2[attr] !== obj1[attr] ? obj2[attr] : obj3[attr];
-              }
-              return obj1;
-            };
-
-            return merge(storeItem, newItem, i);
-          });
-
-          resultCollection.push(
-            newCollection.filter((i) => {
-              const id =
-                (i as BonusActivity).activity.id || (i as UpdateItem).item.id;
-              return (
-                !(storeIds.includes(id) && !updatedIds.includes(id)) ||
-                !updatedIds.includes(id)
-              );
-            })
-          );
-
-          return resultCollection;
-        };
-
-        // merged update
         const targetUpdate = {
           ...this.state.update!,
+          date:
+            this.state.update!.date !== storeUpdate?.date
+              ? this.state.update!.date
+              : newUpdate.date,
+          podium: !_.isEmpty(podium) ? podium : undefined,
+          new: mergeArrays(
+            storeUpdate?.new || [],
+            this.state.update!.new,
+            newUpdate.new,
+            (i) => i.item.id
+          ),
+          bonusActivities: mergeArrays(
+            storeUpdate?.bonusActivities || [],
+            this.state.update!.bonusActivities,
+            newUpdate.bonusActivities,
+            (i) => i.activity.id
+          ),
+          sale: mergeArrays(
+            storeUpdate?.sale || [],
+            this.state.update!.sale,
+            newUpdate.sale,
+            (i) => i.item.id
+          ),
+          targetedSale: mergeArrays(
+            storeUpdate?.targetedSale || [],
+            this.state.update!.targetedSale,
+            newUpdate.targetedSale,
+            (i) => i.item.id
+          ),
+          twitchPrime: mergeArrays(
+            storeUpdate?.twitchPrime || [],
+            this.state.update!.twitchPrime,
+            newUpdate.twitchPrime,
+            (i) => i.item.id
+          ),
+          timeTrial: !_.isEmpty(timeTrial) ? timeTrial : undefined,
+          rcTimeTrial: !_.isEmpty(rcTimeTrial) ? rcTimeTrial : undefined,
+          premiumRace: !_.isEmpty(premiumRace) ? premiumRace : undefined,
+          redditThread:
+            storeUpdate?.redditThread ||
+            this.state.update!.redditThread ||
+            newUpdate.redditThread,
         };
-        this.setState({
-          update: targetUpdate,
-        });
+
+        this.setState(
+          {
+            update: targetUpdate as Update,
+          },
+          this.saveUpdate
+        );
       });
       this.setState({
         unsubscribe,
@@ -322,12 +341,18 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
           ? resp.name.substring(3)
           : resp.json.data.things[0].id;
 
+        const cleanedUpdate = _({
+          ...update,
+          redditThread: id,
+        })
+          .omitBy(_.isUndefined)
+          .value();
+
+        console.log(cleanedUpdate);
+
         if (docRef) {
           docRef!
-            .update({
-              ...update,
-              redditThread: id,
-            })
+            .update(cleanedUpdate)
             .then(() => {
               const u = {
                 ...this.state.update!!,
@@ -343,10 +368,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         } else {
           this.props.firebase?.db
             .collection("updates")
-            .add({
-              ...update,
-              redditThread: id,
-            })
+            .add(cleanedUpdate)
             .then((ref: firebase.firestore.DocumentReference) => {
               const u = {
                 ...this.state.update!!,
