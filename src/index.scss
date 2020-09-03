@@ -6,6 +6,11 @@ $rockstar-yellow: #f99c1c;
 
 @import "~bootstrap/scss/bootstrap";
 
+.card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+  border-radius: 2px;
+}
+
 @font-face {
   font-family: "Pricedown";
   src: url("./fonts/pricedown.ttf");
@@ -27,6 +32,7 @@ html {
 body {
   height: 100%;
   margin: 0;
+  padding-top: 56px; /* matches fixed nav height */
   font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen",
     "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
