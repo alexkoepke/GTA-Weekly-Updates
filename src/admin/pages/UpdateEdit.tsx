@@ -9,7 +9,7 @@ import {
   FormControl,
   InputGroup,
   ListGroup,
-  Spinner,
+  Spinner
 } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
@@ -22,7 +22,7 @@ import { Mission } from "../../models/mission";
 import Update, {
   BonusActivity,
   SaleItem,
-  UpdateItem,
+  UpdateItem
 } from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
@@ -30,7 +30,7 @@ import { setMissions } from "../../store/Missions";
 import { setRedditClient } from "../../store/Reddit";
 import {
   getMissionsAsSearchInputOptions,
-  getVehiclesAsSearchInputOptions,
+  getVehiclesAsSearchInputOptions
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
@@ -496,13 +496,25 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
               )} Weekly GTA Online Bonuses`,
               text: groups.join("\n\n"),
             })
-            .then(updateDoc);
+            .then((s) => {
+              s.distinguish({
+                status: true,
+              })
+                .then((s) => {
+                  s.sticky({
+                    num: 2,
+                  })
+                    .then(updateDoc)
+                    .catch(console.error);
+                })
+                .catch(console.error);
+            });
         } else {
           this.props.redditClient
             .getSubmission(update.redditThread)
             .fetch()
             .then((s) => {
-              s.edit(groups.join("\n\n")).then(updateDoc);
+              s.edit(groups.join("\n\n")).then(updateDoc).catch(console.error);
             });
         }
       }
