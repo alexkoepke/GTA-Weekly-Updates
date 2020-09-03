@@ -9,7 +9,7 @@ import {
   FormControl,
   InputGroup,
   ListGroup,
-  Spinner
+  Spinner,
 } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
@@ -22,7 +22,7 @@ import { Mission } from "../../models/mission";
 import Update, {
   BonusActivity,
   SaleItem,
-  UpdateItem
+  UpdateItem,
 } from "../../models/update";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
@@ -30,7 +30,7 @@ import { setMissions } from "../../store/Missions";
 import { setRedditClient } from "../../store/Reddit";
 import {
   getMissionsAsSearchInputOptions,
-  getVehiclesAsSearchInputOptions
+  getVehiclesAsSearchInputOptions,
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
@@ -38,6 +38,7 @@ import { mergeArrays, mergeObject } from "../../utils";
 import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
+import UpdatePost from "../../models/UpdatePost";
 
 interface UpdateEditMatch {
   id?: string;
@@ -331,10 +332,11 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         loading: true,
       });
 
-      const updateDoc = (resp: any) => {
-        const id = resp.name
-          ? resp.name.substring(3)
-          : resp.json.data.things[0].id;
+      const updateDoc = (resp?: any) => {
+        const id =
+          resp && resp.name
+            ? resp.name.substring(3)
+            : resp.json.data.things[0].id;
 
         const cleanedUpdate = _({
           ...update,
@@ -378,114 +380,8 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
       };
 
-      const getSaleString = (item: SaleItem) => {
-        const getPriceString = (price: number, saleAmount: number) =>
-          (price * (1 - saleAmount / 100)).toLocaleString("en-US");
-        let priceString = "";
-        if (item.price) {
-          priceString = item.tradePrice
-            ? ` (GTA$ ${getPriceString(
-                item.price,
-                item.amount
-              )} / ${getPriceString(item.tradePrice, item.amount)})`
-            : ` (GTA$ ${getPriceString(item.price, item.amount)})`;
-        } else if (item.minPrice && item.maxPrice) {
-          priceString = ` (GTA$ ${getPriceString(
-            item.minPrice,
-            item.amount
-          )} - ${getPriceString(item.maxPrice, item.amount)})`;
-        }
-
-        return item.url
-          ? ` - ${item.amount}% off ${item.name}${priceString} [↗](${item.url})`
-          : ` - ${item.amount}% off ${item.name}${priceString}`;
-      };
-
       if (this.props.redditClient) {
-        const groups: string[] = [];
-
-        if (update.new.length) {
-          groups.push(
-            "**New Content**\n\n" +
-              u.new
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.name} [↗](${item.url})`
-                    : ` - ${item.name}`
-                )
-                .join("\n\n")
-          );
-        }
-        if (update.podium) {
-          groups.push(
-            "**Podium Vehicle**\n\n" +
-              (update.podium.url
-                ? ` - ${update.podium.name} [↗](${update.podium.url})`
-                : ` - ${update.podium.name}`)
-          );
-        }
-        if (update.bonusActivities.length) {
-          groups.push(
-            "**Bonus GTA$ and RP Activities**\n\n" +
-              u.bonusActivities
-                .map((activity) => {
-                  const bonusString =
-                    activity.moneyAmount === activity.rpAmount
-                      ? activity.moneyAmount + "x GTA$ and RP"
-                      : activity.moneyAmount +
-                        "x GTA$ and " +
-                        activity.rpAmount +
-                        "x RP";
-
-                  return (
-                    " - " +
-                    bonusString +
-                    " on " +
-                    (activity.url
-                      ? `${activity.name} [↗](${activity.url})`
-                      : `${activity.name}`)
-                  );
-                })
-                .join("\n\n")
-          );
-        }
-        if (update.sale.length) {
-          groups.push(
-            "**Discounted Content**\n\n" +
-              u.sale.map(getSaleString).join("\n\n")
-          );
-        }
-        if (update.twitchPrime.length) {
-          groups.push(
-            "**Twitch Prime Bonuses**\n\n" +
-              u.twitchPrime.map(getSaleString).join("\n\n")
-          );
-        }
-        if (update.targetedSale.length) {
-          groups.push(
-            "**Targeted Sales**\n\n" +
-              u.targetedSale.map(getSaleString).join("\n\n")
-          );
-        }
-        if (update.timeTrial) {
-          groups.push(
-            `**Time Trial**\n\n - [${update.timeTrial.name}](${update.timeTrial.url})`
-          );
-        }
-        if (update.rcTimeTrial) {
-          groups.push(
-            `**RC Bandito Time Trial**\n\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
-          );
-        }
-        if (update.premiumRace) {
-          groups.push(
-            `**Premium Race**\n\n - [${update.premiumRace.name}](${update.premiumRace.url})`
-          );
-        }
-
-        groups.push(
-          "View embedded updates [here](https://gtaonline-cf0ea.web.app/)."
-        );
+        const post = new UpdatePost(this.state.update);
 
         if (!update.redditThread) {
           this.props.redditClient
@@ -494,7 +390,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
               title: `${u.date.toLocaleDateString(
                 "en-us"
               )} Weekly GTA Online Bonuses`,
-              text: groups.join("\n\n"),
+              text: post.get(),
             })
             .then((s) => {
               s.distinguish({
@@ -513,10 +409,12 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
           this.props.redditClient
             .getSubmission(update.redditThread)
             .fetch()
-            .then((s) => {
-              s.edit(groups.join("\n\n")).then(updateDoc).catch(console.error);
-            });
+            .then((s) =>
+              s.edit(post.get()).then(updateDoc).catch(console.error)
+            );
         }
+      } else {
+        updateDoc();
       }
     }
   }, 250);
