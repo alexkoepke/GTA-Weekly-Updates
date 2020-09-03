@@ -9,7 +9,7 @@ import {
   FormControl,
   InputGroup,
   ListGroup,
-  Spinner,
+  Spinner
 } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
@@ -22,15 +22,16 @@ import { Mission } from "../../models/mission";
 import Update, {
   BonusActivity,
   SaleItem,
-  UpdateItem,
+  UpdateItem
 } from "../../models/update";
+import UpdatePost from "../../models/UpdatePost";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
 import { setMissions } from "../../store/Missions";
 import { setRedditClient } from "../../store/Reddit";
 import {
   getMissionsAsSearchInputOptions,
-  getVehiclesAsSearchInputOptions,
+  getVehiclesAsSearchInputOptions
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
@@ -38,7 +39,6 @@ import { mergeArrays, mergeObject } from "../../utils";
 import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
-import UpdatePost from "../../models/UpdatePost";
 
 interface UpdateEditMatch {
   id?: string;
@@ -381,7 +381,9 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
       };
 
       if (this.props.redditClient) {
-        const post = new UpdatePost(this.state.update);
+        const post = new UpdatePost(this.state.update)
+          .addLinks()
+          .addDisclaimer();
 
         if (!update.redditThread) {
           this.props.redditClient
@@ -390,7 +392,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
               title: `${u.date.toLocaleDateString(
                 "en-us"
               )} Weekly GTA Online Bonuses`,
-              text: post.get(),
+              text: post.getString(),
             })
             .then((s) => {
               s.distinguish({
@@ -410,7 +412,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
             .getSubmission(update.redditThread)
             .fetch()
             .then((s) =>
-              s.edit(post.get()).then(updateDoc).catch(console.error)
+              s.edit(post.getString()).then(updateDoc).catch(console.error)
             );
         }
       } else {
@@ -436,11 +438,37 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
           <div>
             <h1 className="pb-4 mb-4">{update.date.toLocaleDateString()}</h1>
             <Form className="mt-4 pt-4" onSubmit={(e) => e.preventDefault()}>
-              <DatePicker
-                className="mb-2 mt-4"
-                selected={update.date}
-                onChange={this.setDate}
-              />
+              <Form.Row className="my-2">
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Date *</Form.Label>
+                  <DatePicker selected={update.date} onChange={this.setDate} />
+                </Form.Group>
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Newswire Link</Form.Label>
+                  <Form.Control
+                    placeholder="Newswire Link"
+                    name="newswire"
+                    value={update.newswire?.url || ""}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      {
+                        const { value } = event.target;
+                        fetch("https://cors-anywhere.herokuapp.com/" + value)
+                          .then((response) => response.text())
+                          .then((text) => {
+                            const parsed = new DOMParser().parseFromString(
+                              text,
+                              "text/html"
+                            );
+                            this.setValue("newswire", {
+                              url: value,
+                              title: parsed.title,
+                            });
+                          });
+                      }
+                    }}
+                  />
+                </Form.Group>
+              </Form.Row>
               <Form.Row className="my-2">
                 <Form.Group as={Col} md="6" sm="12">
                   <Form.Label>Podium</Form.Label>

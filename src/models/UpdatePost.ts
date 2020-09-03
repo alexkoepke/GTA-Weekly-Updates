@@ -1,7 +1,11 @@
 import Update, { SaleItem } from "./update";
 
 export default class UpdatePost {
-  constructor(private update: Update) {}
+  private postString: string = "";
+
+  constructor(private update: Update) {
+    this.build();
+  }
 
   getSaleString = (item: SaleItem) => {
     const getPriceString = (price: number, saleAmount: number) =>
@@ -26,7 +30,7 @@ export default class UpdatePost {
       : ` - ${item.amount}% off ${item.name}${priceString}`;
   };
 
-  get = () => {
+  build = () => {
     const groups: string[] = [];
 
     if (this.update.new.length) {
@@ -106,10 +110,29 @@ export default class UpdatePost {
       );
     }
 
-    groups.push(
-      "View embedded updates [here](https://gtaonline-cf0ea.web.app/)."
-    );
+    this.postString = groups.join("\n\n");
 
-    return groups.join("\n\n");
+    return this;
+  };
+
+  addLinks = () => {
+    let links = "[Embedded Updates](https://gtaonline-cf0ea.web.app/)";
+    if (this.update.newswire)
+      links += ` | [Rockstar Newswire](${this.update.newswire})`;
+    this.postString += "\n\n" + links;
+
+    return this;
+  };
+
+  addDisclaimer = () => {
+    const disclaimer =
+      "*Update items, discounts and bonuses are added as they are found in-game or other reliable sources and may not be complete at the current time.*";
+    this.postString += "\n\n" + disclaimer;
+
+    return this;
+  };
+
+  getString = () => {
+    return this.postString;
   };
 }
