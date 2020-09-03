@@ -88,7 +88,11 @@ export function mergeArrays<T>(
   return resultCollection;
 }
 
-export function safeInt(input: string, fallback: number, returnEmpty = true) {
+export function safeInt(
+  input: string,
+  fallback: number,
+  returnEmpty = true
+): number {
   if (!isNaN(parseInt(input))) {
     return parseInt(input);
   } else if (returnEmpty && !input) {
