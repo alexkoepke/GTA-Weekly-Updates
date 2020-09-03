@@ -9,7 +9,7 @@ import {
   FormControl,
   InputGroup,
   ListGroup,
-  Spinner
+  Spinner,
 } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import { connect } from "react-redux";
@@ -22,7 +22,7 @@ import { Mission } from "../../models/mission";
 import Update, {
   BonusActivity,
   SaleItem,
-  UpdateItem
+  UpdateItem,
 } from "../../models/update";
 import UpdatePost from "../../models/UpdatePost";
 import { Vehicle } from "../../models/vehicle";
@@ -31,7 +31,7 @@ import { setMissions } from "../../store/Missions";
 import { setRedditClient } from "../../store/Reddit";
 import {
   getMissionsAsSearchInputOptions,
-  getVehiclesAsSearchInputOptions
+  getVehiclesAsSearchInputOptions,
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
@@ -337,6 +337,13 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
           resp && resp.name
             ? resp.name.substring(3)
             : resp.json.data.things[0].id;
+
+        const cleanedUpdate = _({
+          ...update,
+          redditThread: id,
+        })
+          .omitBy(_.isUndefined)
+          .value();
 
         const cleanedUpdate = _({
           ...update,
