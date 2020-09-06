@@ -16,14 +16,17 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
 
   return (
     <React.Fragment>
-      <li onClick={handleShow}>
-        <FontAwesomeIcon icon={faInfoCircle} />
+      <div
+        onClick={handleShow}
+        className="update-table__cell"
+      >
+        {/* <FontAwesomeIcon icon={faInfoCircle} /> */}
         <span>
           {(item as SaleItem).amount
             ? `${item.name} - ${(item as SaleItem).amount}% off`
             : item.name}{" "}
         </span>
-      </li>
+      </div>
       <Modal show={show} onHide={handleClose} centered>
         <Modal.Header closeButton>
           <Modal.Title>{item.name}</Modal.Title>

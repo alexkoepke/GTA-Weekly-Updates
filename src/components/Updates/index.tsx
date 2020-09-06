@@ -16,6 +16,8 @@ import { setUpdates } from "../../store/Updates";
 import UpdateActivityElement from "./UpdateActivityElement";
 import UpdateItemElement from "./UpdateItemElement";
 import "./index.scss";
+import "../../styles/reel.scss";
+import "../../styles/update-table.scss";
 
 interface UpdatesProps {
   firebase?: Firebase;
@@ -39,20 +41,26 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
 
   if (!loading) {
     return (
-      <Container className="updates justify-content-center p-0">
+      <div className="updates justify-content-center p-0">
+        <div className="reel">
+          <span className="reel-item is-active">9/3/2020</span>
+          <span className="reel-item">8/27/2020</span>
+          <span className="reel-item">8/20/2020</span>
+          <span className="reel-item">8/13/2020</span>
+        </div>
         <div className="background" />
         {updates
           .sort((u1, u2) =>
             u1.date === u2.date ? 0 : u1.date < u2.date ? 1 : -1
           )
           .map((update: Update, index: number) => (
-            <Card
+            <div
               className="update"
               key={index}
               data-aos="zoom-in-up"
               data-aos-duration="400"
             >
-              <Card.Header
+              {/* <div
                 className="update-title"
               >
                   <span
@@ -88,106 +96,139 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                       </Button>
                     )}
                   </span>
-              </Card.Header>
-              <Card.Body>
+              </div> */}
+              <div className="update-table">
                 {update.podium && (
-                  <section className="update-section update-section__podium-vehicle">
-                    <b>Podium Vehicle</b>
-                    <br />
-                    <ul className="update-item-list">
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        Podium Vehicle
+                      </div>
+                    </div>
+                    <div className="update-table__column">
                       <UpdateItemElement
                         key={update.podium.item.id}
                         item={update.podium}
                       />
-                    </ul>
-                  </section>
+                    </div>
+                  </div>
                 )}
                 {update.new.length !== 0 && (
-                  <section className="update-section update-section__new-content">
-                    <b>New Content</b>
-                    <ul className="update-item-list">
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        New Content
+                      </div>
+                    </div>
+                    <div className="update-table__column">
                       {update.new.map((item: UpdateItem) => (
                         <UpdateItemElement key={item.item.id} item={item} />
                       ))}
-                    </ul>
-                  </section>
+                    </div>
+                  </div>
                 )}
                 {update.bonusActivities.length !== 0 && (
-                  <section className="update-section update-section__bonus-activites">
-                    <b>Bonus GTA$ and RP Activities</b>
-                    <ul className="update-item-list">
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        Bonus GTA$ and RP Activities
+                      </div>
+                    </div>
+                    <div className="update-table__column">
                       {update.bonusActivities.map((activity: BonusActivity) => (
                         <UpdateActivityElement
                           key={activity.activity.id}
                           activity={activity}
                         />
                       ))}
-                    </ul>
-                  </section>
+                    </div>
+                  </div>
                 )}
                 {update.sale.length !== 0 && (
-                  <section className="update-section update-section__discounts">
-                    <b>Discounts</b>
-                    <ul className="update-item-list">
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        Discounts
+                      </div>
+                    </div>
+                    <div className="update-table__column">
                       {update.sale.map((item: SaleItem) => (
-                        <UpdateItemElement key={item.item.id} item={item} />
-                      ))}
-                    </ul>
-                  </section>
+                          <UpdateItemElement key={item.item.id} item={item} />
+                        ))}
+                    </div>
+                  </div>
                 )}
                 {update.twitchPrime.length !== 0 && (
-                  <section className="update-section update-section__twitch-prime">
-                    <b>Twitch Prime Bonuses</b>
-                    <ul className="update-item-list">
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        Twitch Prime Bonuses
+                      </div>
+                    </div>
+                    <div className="update-table__column">
                       {update.twitchPrime.map((item: SaleItem) => (
-                        <UpdateItemElement key={item.item.id} item={item} />
-                      ))}
-                    </ul>
-                  </section>
+                          <UpdateItemElement key={item.item.id} item={item} />
+                        ))}
+                    </div>
+                  </div>
                 )}
                 {update.targetedSale.length !== 0 && (
-                  <section className="update-section update-section__targeted-sales">
-                    <b>Targeted Sales</b>
-                    <ul className="update-item-list">
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        Targeted Sales
+                      </div>
+                    </div>
+                    <div className="update-table__column">
                       {update.targetedSale.map((item: SaleItem) => (
                         <UpdateItemElement key={item.item.id} item={item} />
                       ))}
-                    </ul>
-                  </section>
+                    </div>
+                  </div>
                 )}
                 {update.timeTrial && (
-                  <section className="update-section update-section__time-trial">
-                    <p>
-                      <b>Time Trial</b>
-                      <br />
-                      <a
-                        href={update.timeTrial.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {update.timeTrial.name}, Par Time{" "}
-                        {update.timeTrial.parTime}
-                        <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      </a>
-                    </p>
-                  </section>
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                      Time Trial
+                      </div>
+                    </div>
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        <a
+                          href={update.timeTrial.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {update.timeTrial.name}, Par Time{" "}
+                          {update.timeTrial.parTime}
+                          <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {update.rcTimeTrial && (
-                  <section className="update-section update-section__rc-time-trial">
-                    <p>
-                      <b>RC Bandito Time Trial</b>
-                      <br />
-                      <a
-                        href={update.rcTimeTrial.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {update.rcTimeTrial.name}, Par Time{" "}
-                        {update.rcTimeTrial.parTime}
-                        <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      </a>
-                    </p>
-                  </section>
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        RC Bandito Time Trial
+                      </div>
+                    </div>
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        <a
+                          href={update.rcTimeTrial.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {update.rcTimeTrial.name}, Par Time{" "}
+                          {update.rcTimeTrial.parTime}
+                          <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {update.premiumRace && (
                   <section className="update-section update-section__premium-race">
@@ -204,10 +245,10 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                     </p>
                   </section>
                 )}
-              </Card.Body>
-            </Card>
+              </div>
+            </div>
           ))}
-      </Container>
+      </div>
     );
   } else {
     return (

@@ -7,14 +7,28 @@ $rockstar-yellow: #f99c1c;
   right: 0;
   bottom: 0;
   z-index: -100;
-  background-color: #f99c1c;
   background-image: url("/res/img/orange-blaine-county.jpg");
   background-size: cover;
   background-position: center;
-  opacity: 0.8;
+}
+.background::after {
+  content: "";
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+}
+
+.updates {
+  margin: 0 auto;
+  max-width: 1400px;
+  width: 100%;
 }
 
 .update {
+  // background: rgba(51,51,51,0.75);
+  color: white;
   margin-bottom: 4rem;
 
   /* set margin on external link icons so they 

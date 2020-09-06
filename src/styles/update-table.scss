@@ -1,0 +1,45 @@
+@import "_variables.scss";
+$cell-margin: 3px;
+
+.update-table {
+
+}
+
+.update-table__row {
+  display: flex;
+  flex-flow: row nowrap;
+}
+
+.update-table__column {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: center;
+  width: 100%;
+  &:first-of-type {
+    margin-right: $cell-margin;
+    width: 25%;
+  }
+}
+
+.update-table__cell {
+  background: $rockstar-darkgrey-transparent;
+  color: #fff;
+  margin-bottom: $cell-margin;
+  padding: 0.25rem;
+  padding-left: 1rem;
+  transition: .25s all;  
+  width: 100%;
+}
+
+.update-table__column:nth-child(1) .update-table__cell {
+  font-weight: bold;
+}
+
+.update-table__column:nth-child(2) .update-table__cell {
+  cursor: pointer;
+
+  &:hover {
+    background: white;
+    color: #333;
+  }
+}
