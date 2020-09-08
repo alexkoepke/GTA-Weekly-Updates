@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import React from "react";
 import { Button, Image, Modal } from "react-bootstrap";
 import { SaleItem, UpdateItem } from "../../models/update";
+import "../../styles/bs-modal.scss";
 
 interface UpdateItemCardProps {
   item: UpdateItem | SaleItem;
