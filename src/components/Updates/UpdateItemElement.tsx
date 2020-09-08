@@ -16,10 +16,7 @@ function UpdateItemElement({ item }: UpdateItemCardProps) {
 
   return (
     <React.Fragment>
-      <div
-        onClick={handleShow}
-        className="update-table__cell"
-      >
+      <div onClick={handleShow}>
         {/* <FontAwesomeIcon icon={faInfoCircle} /> */}
         <span>
           {(item as SaleItem).amount

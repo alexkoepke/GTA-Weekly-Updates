@@ -16,10 +16,7 @@ function UpdateActivityElement({ activity }: UpdateActivityElementProps) {
 
   return (
     <React.Fragment>
-      <div
-        onClick={handleShow}
-        className="update-table__cell"
-      >
+      <div onClick={handleShow}>
         {/* <FontAwesomeIcon icon={faInfoCircle} /> */}
         <span>
           {activity.moneyAmount === activity.rpAmount
