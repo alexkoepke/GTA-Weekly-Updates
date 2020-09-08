@@ -24,6 +24,7 @@ import Update, {
   SaleItem,
   UpdateItem
 } from "../../models/update";
+import UpdatePost from "../../models/UpdatePost";
 import { Vehicle } from "../../models/vehicle";
 import { RootState } from "../../store";
 import { setMissions } from "../../store/Missions";
@@ -34,6 +35,7 @@ import {
 } from "../../store/selectors";
 import { setUpdate, setUpdates } from "../../store/Updates";
 import { setVehicles } from "../../store/Vehicles";
+import { mergeArrays, mergeObject } from "../../utils";
 import UpdateActivityEditor from "./UpdateActivityEditor";
 import "./UpdateEdit.scss";
 import UpdateItemEditor from "./UpdateItemEditor";
@@ -61,6 +63,8 @@ interface UpdateEditState {
   update?: Update;
   updateExists: boolean;
   loading: boolean;
+  unsubscribe?: () => void;
+  handledInitialSnapshot: boolean;
 }
 
 class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
@@ -70,29 +74,138 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
     this.state = {
       updateExists: true,
       loading: false,
+      handledInitialSnapshot: false,
     };
+  }
+
+  async componentDidUpdate(
+    _prevProps: UpdateEditProps,
+    prevState: UpdateEditState
+  ) {
+    if (prevState.update !== this.state.update && !this.state.unsubscribe) {
+      const unsubscribe = this.state.update?.docRef?.onSnapshot((doc) => {
+        if (!this.state.handledInitialSnapshot) {
+          this.setState({ handledInitialSnapshot: true });
+          return;
+        }
+        // last known server state
+        const storeUpdate = this.props.updates.find(
+          (u) => u.docRef?.id === this.props.match.params.id
+        );
+        // latest server state, modified by other users
+        const newUpdate = {
+          ...(doc.data() as Update),
+          bonusActivities: doc.data()!.bonusActivities || [],
+          date: new Date(doc.data()!.date.seconds * 1000),
+          docRef: doc.ref,
+        };
+
+        const podium = mergeObject(
+          storeUpdate?.podium || {},
+          this.state.update!.podium || {},
+          newUpdate.podium || {}
+        );
+
+        const timeTrial = mergeObject(
+          storeUpdate?.timeTrial || {},
+          this.state.update!.timeTrial || {},
+          newUpdate.timeTrial || {}
+        );
+
+        const rcTimeTrial = mergeObject(
+          storeUpdate?.rcTimeTrial || {},
+          this.state.update!.rcTimeTrial || {},
+          newUpdate.rcTimeTrial || {}
+        );
+
+        const premiumRace = mergeObject(
+          storeUpdate?.premiumRace || {},
+          this.state.update!.premiumRace || {},
+          newUpdate.premiumRace || {}
+        );
+
+        const targetUpdate = {
+          ...this.state.update!,
+          date:
+            this.state.update!.date !== storeUpdate?.date
+              ? this.state.update!.date
+              : newUpdate.date,
+          podium: !_.isEmpty(podium) ? podium : undefined,
+          new: mergeArrays(
+            storeUpdate?.new || [],
+            this.state.update!.new,
+            newUpdate.new,
+            (i) => i.item.id
+          ),
+          bonusActivities: mergeArrays(
+            storeUpdate?.bonusActivities || [],
+            this.state.update!.bonusActivities,
+            newUpdate.bonusActivities,
+            (i) => i.activity.id
+          ),
+          sale: mergeArrays(
+            storeUpdate?.sale || [],
+            this.state.update!.sale,
+            newUpdate.sale,
+            (i) => i.item.id
+          ),
+          targetedSale: mergeArrays(
+            storeUpdate?.targetedSale || [],
+            this.state.update!.targetedSale,
+            newUpdate.targetedSale,
+            (i) => i.item.id
+          ),
+          twitchPrime: mergeArrays(
+            storeUpdate?.twitchPrime || [],
+            this.state.update!.twitchPrime,
+            newUpdate.twitchPrime,
+            (i) => i.item.id
+          ),
+          timeTrial: !_.isEmpty(timeTrial) ? timeTrial : undefined,
+          rcTimeTrial: !_.isEmpty(rcTimeTrial) ? rcTimeTrial : undefined,
+          premiumRace: !_.isEmpty(premiumRace) ? premiumRace : undefined,
+          redditThread:
+            storeUpdate?.redditThread ||
+            this.state.update!.redditThread ||
+            newUpdate.redditThread,
+        };
+
+        this.setState({ update: targetUpdate as Update });
+      });
+      this.setState({
+        unsubscribe,
+      });
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.state.unsubscribe) this.state.unsubscribe();
   }
 
   async componentDidMount() {
     if (this.props.match.params.id) {
-      if (!this.props.updates.length) {
-        const u = await this.props.firebase!.getUpdates();
-        this.props.setUpdates(u);
-      }
-
       const update = this.props.updates.filter(
         (u) => u.docRef?.id === this.props.match.params.id
       );
-
       if (update.length) {
         this.setState({
           update: update[0],
         });
       } else {
-        this.setState({
-          updateExists: false,
-        });
-        return;
+        const u = await this.props.firebase!.getUpdate(
+          this.props.match.params.id
+        );
+        if (u) {
+          this.props.setUpdate(u);
+          this.setState({
+            update: u,
+          });
+        } else {
+          this.setState({
+            updateExists: false,
+          });
+          return;
+        }
       }
     } else {
       this.setState({
@@ -219,17 +332,22 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         loading: true,
       });
 
-      const updateDoc = (resp: any) => {
-        const id = resp.name
-          ? resp.name.substring(3)
-          : resp.json.data.things[0].id;
+      const updateDoc = (resp?: any) => {
+        const id =
+          resp && resp.name
+            ? resp.name.substring(3)
+            : resp.json.data.things[0].id;
+
+        const cleanedUpdate = _({
+          ...update,
+          redditThread: id,
+        })
+          .omitBy(_.isUndefined)
+          .value();
 
         if (docRef) {
           docRef!
-            .update({
-              ...update,
-              redditThread: id,
-            })
+            .update(cleanedUpdate)
             .then(() => {
               const u = {
                 ...this.state.update!!,
@@ -245,10 +363,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         } else {
           this.props.firebase?.db
             .collection("updates")
-            .add({
-              ...update,
-              redditThread: id,
-            })
+            .add(cleanedUpdate)
             .then((ref: firebase.firestore.DocumentReference) => {
               const u = {
                 ...this.state.update!!,
@@ -265,114 +380,10 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
         }
       };
 
-      const getSaleString = (item: SaleItem) => {
-        const getPriceString = (price: number, saleAmount: number) =>
-          (price * (1 - saleAmount / 100)).toLocaleString("en-US");
-        let priceString = "";
-        if (item.price) {
-          priceString = item.tradePrice
-            ? ` (GTA$ ${getPriceString(
-                item.price,
-                item.amount
-              )} / ${getPriceString(item.tradePrice, item.amount)})`
-            : ` (GTA$ ${getPriceString(item.price, item.amount)})`;
-        } else if (item.minPrice && item.maxPrice) {
-          priceString = ` (GTA$ ${getPriceString(
-            item.minPrice,
-            item.amount
-          )} - ${getPriceString(item.maxPrice, item.amount)})`;
-        }
-
-        return item.url
-          ? ` - ${item.amount}% off ${item.name}${priceString} [↗](${item.url})`
-          : ` - ${item.amount}% off ${item.name}${priceString}`;
-      };
-
       if (this.props.redditClient) {
-        const groups: string[] = [];
-
-        if (update.new.length) {
-          groups.push(
-            "**New Content**\n\n" +
-              u.new
-                .map((item) =>
-                  item.url
-                    ? ` - ${item.name} [↗](${item.url})`
-                    : ` - ${item.name}`
-                )
-                .join("\n\n")
-          );
-        }
-        if (update.podium) {
-          groups.push(
-            "**Podium Vehicle**\n\n" +
-              (update.podium.url
-                ? ` - ${update.podium.name} [↗](${update.podium.url})`
-                : ` - ${update.podium.name}`)
-          );
-        }
-        if (update.bonusActivities.length) {
-          groups.push(
-            "**Bonus GTA$ and RP Activities**\n\n" +
-              u.bonusActivities
-                .map((activity) => {
-                  const bonusString =
-                    activity.moneyAmount === activity.rpAmount
-                      ? activity.moneyAmount + "x GTA$ and RP"
-                      : activity.moneyAmount +
-                        "x GTA$ and " +
-                        activity.rpAmount +
-                        "x RP";
-
-                  return (
-                    " - " +
-                    bonusString +
-                    " on " +
-                    (activity.url
-                      ? `${activity.name} [↗](${activity.url})`
-                      : `${activity.name}`)
-                  );
-                })
-                .join("\n\n")
-          );
-        }
-        if (update.sale.length) {
-          groups.push(
-            "**Discounted Content**\n\n" +
-              u.sale.map(getSaleString).join("\n\n")
-          );
-        }
-        if (update.twitchPrime.length) {
-          groups.push(
-            "**Twitch Prime Bonuses**\n\n" +
-              u.twitchPrime.map(getSaleString).join("\n\n")
-          );
-        }
-        if (update.targetedSale.length) {
-          groups.push(
-            "**Targeted Sales**\n\n" +
-              u.targetedSale.map(getSaleString).join("\n\n")
-          );
-        }
-        if (update.timeTrial) {
-          groups.push(
-            `**Time Trial**\n\n - [${update.timeTrial.name}](${update.timeTrial.url})`
-          );
-        }
-        if (update.rcTimeTrial) {
-          groups.push(
-            `**RC Bandito Time Trial**\n\n - [${update.rcTimeTrial.name}](${update.rcTimeTrial.url})`
-          );
-        }
-        if (update.premiumRace) {
-          groups.push(
-            `**Premium Race**\n\n - [${update.premiumRace.name}](${update.premiumRace.url})`
-          );
-        }
-
-        groups.push(
-          "View embedded updates [here](https://gtaonline-cf0ea.web.app/)."
-        );
+        const post = new UpdatePost(this.state.update)
+          .addLinks()
+          .addDisclaimer();
 
         if (!update.redditThread) {
           this.props.redditClient
@@ -381,22 +392,36 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
               title: `${u.date.toLocaleDateString(
                 "en-us"
               )} Weekly GTA Online Bonuses`,
-              text: groups.join("\n\n"),
+              text: post.getString(),
             })
-            .then(updateDoc);
+            .then((s) => {
+              s.distinguish({
+                status: true,
+              })
+                .then((s) => {
+                  s.sticky({
+                    num: 2,
+                  })
+                    .then(updateDoc)
+                    .catch(console.error);
+                })
+                .catch(console.error);
+            });
         } else {
           this.props.redditClient
             .getSubmission(update.redditThread)
             .fetch()
-            .then((s) => {
-              s.edit(groups.join("\n\n")).then(updateDoc);
-            });
+            .then((s) =>
+              s.edit(post.getString()).then(updateDoc).catch(console.error)
+            );
         }
+      } else {
+        updateDoc();
       }
     }
-  }, 2000);
+  }, 250);
 
-  debouncedSave = _.debounce(this.saveUpdate, 5000);
+  debouncedSave = _.debounce(this.saveUpdate, 250);
 
   // tslint:disable-next-line: max-func-body-length
   render() {
@@ -413,11 +438,35 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
           <div>
             <h1 className="pb-4 mb-4">{update.date.toLocaleDateString()}</h1>
             <Form className="mt-4 pt-4" onSubmit={(e) => e.preventDefault()}>
-              <DatePicker
-                className="mb-2 mt-4"
-                selected={update.date}
-                onChange={this.setDate}
-              />
+              <Form.Row className="my-2">
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Date *</Form.Label>
+                  <DatePicker selected={update.date} onChange={this.setDate} />
+                </Form.Group>
+                <Form.Group as={Col} md="6" sm="12">
+                  <Form.Label>Newswire Link</Form.Label>
+                  <Form.Control
+                    placeholder="Newswire Link"
+                    name="newswire"
+                    value={update.newswire?.url || ""}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      const { value } = event.target;
+                      fetch("https://cors-anywhere.herokuapp.com/" + value)
+                        .then((response) => response.text())
+                        .then((text) => {
+                          const parsed = new DOMParser().parseFromString(
+                            text,
+                            "text/html"
+                          );
+                          this.setValue("newswire", {
+                            url: value,
+                            title: parsed.title,
+                          });
+                        });
+                    }}
+                  />
+                </Form.Group>
+              </Form.Row>
               <Form.Row className="my-2">
                 <Form.Group as={Col} md="6" sm="12">
                   <Form.Label>Podium</Form.Label>
@@ -629,7 +678,7 @@ class UpdateEdit extends React.Component<UpdateEditProps, UpdateEditState> {
                       <InputGroup.Text>Premium Race</InputGroup.Text>
                     </InputGroup.Prepend>
                     <FormControl
-                      value={update.premiumRace?.url}
+                      value={update.premiumRace?.name}
                       placeholder="Name"
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                         this.setValue("premiumRace", {
