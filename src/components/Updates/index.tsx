@@ -42,12 +42,12 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
   if (!loading) {
     return (
       <div className="updates justify-content-center p-0">
-        <div className="reel">
+        {/* <div className="reel">
           <span className="reel-item is-active">9/3/2020</span>
           <span className="reel-item">8/27/2020</span>
           <span className="reel-item">8/20/2020</span>
           <span className="reel-item">8/13/2020</span>
-        </div>
+        </div> */}
         <div className="background" />
         {updates
           .sort((u1, u2) =>
@@ -60,7 +60,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
               data-aos="zoom-in-up"
               data-aos-duration="400"
             >
-              {/* <div
+              <div
                 className="update-title"
               >
                   <span
@@ -96,7 +96,7 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                       </Button>
                     )}
                   </span>
-              </div> */}
+              </div>
               <div className="update-table">
                 {update.podium && (
                   <div className="update-table__row">
@@ -106,10 +106,12 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                       </div>
                     </div>
                     <div className="update-table__column">
-                      <UpdateItemElement
-                        key={update.podium.item.id}
-                        item={update.podium}
-                      />
+                      <div className="update-table__cell">
+                        <UpdateItemElement
+                          key={update.podium.item.id}
+                          item={update.podium}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -122,7 +124,9 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                     </div>
                     <div className="update-table__column">
                       {update.new.map((item: UpdateItem) => (
-                        <UpdateItemElement key={item.item.id} item={item} />
+                        <div className="update-table__cell">
+                          <UpdateItemElement key={item.item.id} item={item} />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -136,10 +140,12 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                     </div>
                     <div className="update-table__column">
                       {update.bonusActivities.map((activity: BonusActivity) => (
-                        <UpdateActivityElement
-                          key={activity.activity.id}
-                          activity={activity}
-                        />
+                        <div className="update-table__cell">
+                          <UpdateActivityElement
+                            key={activity.activity.id}
+                            activity={activity}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -153,8 +159,10 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                     </div>
                     <div className="update-table__column">
                       {update.sale.map((item: SaleItem) => (
+                        <div className="update-table__cell">
                           <UpdateItemElement key={item.item.id} item={item} />
-                        ))}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -167,8 +175,10 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                     </div>
                     <div className="update-table__column">
                       {update.twitchPrime.map((item: SaleItem) => (
+                        <div className="update-table__cell">
                           <UpdateItemElement key={item.item.id} item={item} />
-                        ))}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -181,7 +191,9 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                     </div>
                     <div className="update-table__column">
                       {update.targetedSale.map((item: SaleItem) => (
-                        <UpdateItemElement key={item.item.id} item={item} />
+                        <div className="update-table__cell">
+                          <UpdateItemElement key={item.item.id} item={item} />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -231,19 +243,25 @@ const Updates = ({ firebase, updates, setUpdates }: UpdatesProps) => {
                   </div>
                 )}
                 {update.premiumRace && (
-                  <section className="update-section update-section__premium-race">
-                    <p>
-                      <b>Premium Race</b>
-                      <br />
-                      <a
-                        href={update.premiumRace.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {update.premiumRace.name}
-                      </a>
-                    </p>
-                  </section>
+                  <div className="update-table__row">
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        Premium Race
+                      </div>
+                    </div>
+                    <div className="update-table__column">
+                      <div className="update-table__cell">
+                        <a
+                          href={update.premiumRace.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {update.premiumRace.name}
+                          <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
