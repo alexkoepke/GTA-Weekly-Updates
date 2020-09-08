@@ -1,13 +1,23 @@
 @import "_variables.scss";
 $cell-margin: 3px;
 
-.update-table {
+.update-title {
+  background: $rockstar-darkgrey-transparent;
+  margin-bottom: $cell-margin;
+  padding: 0.25rem;
+}
 
+.update-table {
+  position: relative;
 }
 
 .update-table__row {
   display: flex;
   flex-flow: row nowrap;
+
+  &:nth-last-child(2) .update-table__cell {
+    margin-bottom: 0;
+  }
 }
 
 .update-table__column {
@@ -15,6 +25,7 @@ $cell-margin: 3px;
   flex-flow: column nowrap;
   align-items: center;
   width: 100%;
+
   &:first-of-type {
     margin-right: $cell-margin;
     width: 25%;
@@ -29,6 +40,10 @@ $cell-margin: 3px;
   padding-left: 1rem;
   transition: .25s all;  
   width: 100%;
+
+  & a {
+    display: block;
+  }
 }
 
 .update-table__column:nth-child(1) .update-table__cell {
